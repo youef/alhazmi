@@ -1,19 +1,37 @@
-# PostgreSQL 17 database validation — discovered issue and fix
+# تقرير اختبار قاعدة بيانات ديوان الحازمي — 15 نوفمبر 2026
 
-## Verified live in isolated GitHub Actions PostgreSQL
-All ten migration files from V1 through V9 executed in timestamp order successfully on PostgreSQL 17 during workflow run [43692922655](https://github.com/youef/alhazmi/actions/runs/43692922655). All structural tests executed before the integration fixture passed.
+## النتيجة
+**نجح** اختبار PostgreSQL 17 المعزول على GitHub Actions، التشغيل رقم [43693044756](https://github.com/youef/alhazmi/actions/runs/43693044756).
 
-## Bug identified by the first integration fixture
-V1 used `CHECK (father_id IS DISTINCT FROM mother_id)`. When both values are NULL (an unknown-parent or founding ancestor), PostgreSQL evaluates `NULL IS DISTINCT FROM NULL` as FALSE, blocking creation of the person. The integration test caught this.
+تم تطبيق **11 ملف ترحيل من V1 إلى V10** بالترتيب:
+V1–V9 بالإضافة إلى إصلاح V10 `20261115010000_parentage_null_fix.sql`.
 
-## Fix
-Migration `20261115010000_parentage_null_fix.sql` replaces only that obsolete check constraint with `father_id IS NULL OR mother_id IS NULL OR father_id <> mother_id`, so:
-- both missing parents: accepted;
-- only one known parent: accepted;
-- two different parents: accepted;
-- the same person listed as both father and mother: rejected.
+## الذي اختُبر فعليًا ونجح
+- تطبيق جميع الملفات على PostgreSQL 17.12 باستخدام `psql -v ON_ERROR_STOP=1 -1`.
+- فحص وجود الجداول الأساسية وسياسات RLS الافتراضية وعدم إعطاء `anon/authenticated` صلاحية SELECT للجداول المختبرة.
+- فحص الجداول الجديدة V8 وV9.
+- إنشاء بيانات اصطناعية للقبائل والفروع والأشخاص، ورفض ربط شخص بوحدة نسب من قبيلة أخرى.
+- رفض ربط فرع بفرع أب من قبيلة أخرى.
+- رفض علاقة نسب تؤدي لدورة في شجرة الأجداد.
+- رفض تغيير رقم العضوية الداخلي الثابت.
+- رفض دورة وراثة الأدوار.
+- يتم التراجع عن بيانات الاختبار في نهاية الاختبار باستخدام `ROLLBACK`.
 
-Other existing self-parent and cycle protections stay intact.
+## العيب المكتشف وأُصلح
+أول تشغيل [43692922655](https://github.com/youef/alhazmi/actions/runs/43692922655) نجح في تطبيق V1–V9 لكنه فشل عند إنشاء الشخص الذي لا توجد معلومات عن والديه. السبب:
+`CHECK (father_id IS DISTINCT FROM mother_id)` لا يقبل NULL/NULL.
 
-## Release gate
-Do NOT approve production deployment until CI completes with green status, RLS constraints are tested against Supabase Auth and Storage, and consent/field-level server authorization is built and reviewed. CI using simplified `auth.users` is not a full Supabase integration test.
+أضيفت مهاجرة V10 التي تستبدل القيد بـ:
+`father_id IS NULL OR mother_id IS NULL OR father_id <> mother_id`.
+
+## حدود هذه الموافقة
+**نتيجة ناجحة للمخطط الأساسي فقط، وليست اعتمادًا للإنتاج.**
+- `auth.users` في الاختبار نسخة تبسيطية، وليست خدمة Supabase Auth الكاملة.
+- لم يُختبر تنفيذ صلاحيات التطبيق الدقيقة في بيئة متصلة، أو تسجيل الدخول من عمر 15 سنة.
+- لم تُختبر Storage/RLS للمستندات الحقيقية، تشفير الهوية، محرك التفويض، مسارات الموافقة، وحقول الخصوصية.
+- لم يُختبر حجم آلاف أو ملايين الأفراد ولا تنافس معاملات متعددة تحت حمل فعلي.
+- ما زالت واجهة التطبيق ومحرك الصلاحيات والـAPI قيد البناء.
+- المشروع ليس لديه قاعدة Supabase منفصلة باسم alhazmi بين المشاريع المتصلة. لم نعدّل قواعد تطبيقات أخرى.
+
+## قرار النشر
+**Schema CI: PASS**. **Production release: BLOCKED** حتى يكتمل بناء الخادم وسياسات الوصول واختبارها ومراجعة الوثائق وخصوصية الأشخاص.
