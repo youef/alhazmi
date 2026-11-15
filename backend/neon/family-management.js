@@ -2,6 +2,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { pool, authorized, HttpError, isId } from './shared.js';
 import { csrfFor } from './admin.js';
+import { verifyPersonRecord, linkVerifiedAccount, verifyFamilyConnection, shareOwnName, revokeOwnNameShare } from './family-finalization.js';
 
 const roleKeys=['diwan_fakhth_supervisor','diwan_family_supervisor','diwan_parent_supervisor'];
 const relations=['self','spouse','son','daughter','father','mother','grandson','granddaughter','paternal_uncle','paternal_aunt','maternal_uncle','maternal_aunt','paternal_grandfather','paternal_grandmother','maternal_grandfather','maternal_grandmother','guardian'];
@@ -50,7 +51,7 @@ async function inviteData(user){
   pool.query("select p.id,p.full_name_ar name,p.family_unit_id family_id,f.fakhth_unit_id fakhth_id from public.people p join public.lineage_family_fakhth_links f on f.family_unit_id=p.family_unit_id where p.record_status='verified' order by p.full_name_ar limit 120"),
   pool.query('select id,invited_email,invited_name,role_key,fakhth_unit_id,family_unit_id,parent_person_id,created_at,accepted_at,expires_at,revoked_at from public.diwan_supervisor_invitations order by created_at desc limit 70'),
   pool.query('select id,email,name from neon_auth."user" where "emailVerified" is true order by "createdAt" desc limit 100'),
-  pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,q.proposed_notes,u.email,l.name_ar family_name,p.name_ar fakhth_name from public.diwan_family_relation_requests q join neon_auth.\"user\" u on u.id=q.submitter_id join public.lineage_units l on l.id=q.family_unit_id join public.lineage_units p on p.id=q.fakhth_unit_id order by q.created_at desc limit 70"),
+  pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,q.proposed_notes,q.created_person_id,q.anchor_person_id,q.lineage_verified_at,u.email,l.name_ar family_name,p.name_ar fakhth_name,coalesce(created.record_status,'') person_record_status from public.diwan_family_relation_requests q join neon_auth.\"user\" u on u.id=q.submitter_id join public.lineage_units l on l.id=q.family_unit_id join public.lineage_units p on p.id=q.fakhth_unit_id left join public.people created on created.id=q.created_person_id order by q.created_at desc limit 70"),
   pool.query("select a.id,a.user_id,a.scope_type,a.scope_unit_id,a.scope_person_id,a.expires_at,u.email,r.name_ar role_name from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id join neon_auth.\"user\" u on u.id=a.user_id where r.role_key=any($1::text[]) and a.revoked_at is null and a.approved_at is not null order by a.created_at desc limit 80",[roleKeys])
  ]);
  return {fakhths:fakhths.rows,families:families.rows,parents:parents.rows,invitations:invitations.rows,accounts:accounts.rows,queue:queue.rows,activeSupervisors:activeSupervisors.rows};
@@ -86,14 +87,15 @@ async function familyData(user){
  }
 
  const pending=(await pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,f.name_ar family_name from public.diwan_family_relation_requests q join public.lineage_units f on f.id=q.family_unit_id where q.submitter_id=$1 order by q.created_at desc limit 70",[user.id])).rows;
- let relatives=[];
+ const consents=user.person_id?(await pool.query("select c.allowed_user_id,u.email from public.diwan_person_visibility_consents c join neon_auth.\"user\" u on u.id=c.allowed_user_id where c.person_id=$1 and c.revoked_at is null order by c.consent_at desc limit 60",[user.person_id])).rows:[];
+  let relatives=[];
  if(user.person_id){
   // Return identifiers only for relatives whose name sharing is permitted.
   relatives=(await pool.query(
    "select k.relation_kind,k.generation,case when p.id=$2 or p.visibility <> 'private' or coalesce(consent.show_name,false) then p.full_name_ar else null end display_name from public.diwan_family_kinship($2) k join public.people p on p.id=k.related_person_id left join public.diwan_person_visibility_consents consent on consent.person_id=p.id and consent.allowed_user_id=$1 and consent.revoked_at is null order by k.generation,k.relation_kind limit 250",
   [user.id,user.person_id])).rows;
  }
- return {admin,grants,invites,families,pending,relatives,anchors,personId:user.person_id};
+ return {admin,grants,invites,families,pending,relatives,anchors,consents,personId:user.person_id};
 }
 function fingerprint(value,kind){
  const secret=process.env.DIWAN_ID_HMAC_KEY||process.env.NEON_AUTH_COOKIE_SECRET;
@@ -220,6 +222,7 @@ async function reviewFamilyPerson(db,user,form){
  const result=await db.query('select * from public.diwan_family_relation_requests where id=$1 and status=$2 for update',[reqId,expected]);
  const p=result.rows[0];if(!p)reject('This request has already changed',409);
  let personId=p.linked_person_id||null;
+ let marriageId=null;
  if(next==='approved'){
   if(form.get('confirm_evidence')!=='yes')reject('You must verify the evidence independently before accepting the provisional entry');
   if(!personId){
@@ -242,11 +245,12 @@ async function reviewFamilyPerson(db,user,form){
     }
     if(role)await db.query("insert into public.parentage_assertions(child_id,parent_id,parent_role,basis,confidence,status) values($1,$2,$3,'reported','unverified','pending')",[child,parent,role]);
    }else if(p.relationship==='spouse'){
-    await db.query("insert into public.marriages(partner_a_id,partner_b_id,status,notes) values($1,$2,'reported','Unverified relationship pending independent documentation')",[p.anchor_person_id,personId]);
+    const marriage=await db.query("insert into public.marriages(partner_a_id,partner_b_id,status,notes) values($1,$2,'reported','Unverified relationship pending independent documentation') returning id",[p.anchor_person_id,personId]);
+    marriageId=marriage.rows[0].id;
    }
   }
  }
- await db.query("update public.diwan_family_relation_requests set status=$1,reviewed_by=$2,reviewed_at=now(),reviewed_notes=$3,created_person_id=$4,updated_at=now() where id=$5",[next,user.id,note,next==='approved'?personId:null,reqId]);
+ await db.query("update public.diwan_family_relation_requests set status=$1,reviewed_by=$2,reviewed_at=now(),reviewed_notes=$3,created_person_id=$4,marriage_id=$6,updated_at=now() where id=$5",[next,user.id,note,next==='approved'?personId:null,reqId,marriageId]);
  await db.query("insert into public.notifications(user_id,category,title,body,related_record_id) values($1,'lineage','تحديث طلب الربط العائلي','تم تحديث حالة طلبك؛ راجع بوابة الديوان.',$2)",[p.submitter_id,reqId]);
  await audit(db,user,'diwan_family_relation_reviewed','diwan_family_relation_requests',reqId,{decision:next,createdDraft:next==='approved'&&!!personId});
 }
@@ -255,6 +259,11 @@ const operators={
  revoke_invite:['admin',revokeInvitation,'roles.assign'],
  revoke_supervision:['admin',revokeSupervision,'roles.assign'],
  review:['admin',reviewFamilyPerson,'identity.edit'],
+ verify_person:['admin',verifyPersonRecord,'identity.edit'],
+ link_account:['admin',linkVerifiedAccount,'identity.edit'],
+ verify_connection:['admin',verifyFamilyConnection,'lineage.approve'],
+ share_name:['family',shareOwnName,null],
+ revoke_name:['family',revokeOwnNameShare,null],
  accept:['family',acceptInvitation,null],
  submit:['family',requestFamilyPerson,null],
 };
