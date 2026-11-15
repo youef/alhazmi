@@ -162,18 +162,18 @@ export function memberHome(user, status) {
   </section>`, Boolean(user));
 }
 
-export function dashboard(user, modules, status) {
+export function dashboard(user, modules, status, isAdmin = false) {
   const groupIcons = ['members', 'review', 'system'];
   const panels = groups.map(([label, keys], index) => {
     const allowed = keys.filter(key => modules.includes(key));
     return allowed.length ? `<section data-module-group><div class="section-heading"><h2>${label}</h2><small>${new Intl.NumberFormat("ar-SA").format(allowed.length)} خدمات</small></div><div class="grid">${allowed.map(key =>
       `<a class="tile card" href="/dashboard/${key}">${icon(glyphs[key] ? key : groupIcons[index])}<strong>${moduleNames[key]}</strong><span>فتح القسم ←</span></a>`).join('')}</div></section>` : '';
   }).join('');
-  return page('لوحة التحكم', `<section class="member-hero"><div><h1>لوحة التحكم</h1><p>مرحبًا، ${e(user.name)}</p></div>${badge(status)}
+  return page('لوحة التحكم', `<section class="member-hero"><div><h1>لوحة التحكم</h1><p>مرحبًا، ${e(user.name)}</p></div>${isAdmin ? badge("مدير عام — صلاحيات النظام") : badge(status)}
     <div class="actions"><a class="action-link" href="/profile">الملف الشخصي</a><a class="action-link secondary" href="/">رئيسية البوابة</a></div>
   </section>
   <section class="overview" aria-label="نظرة عامة على الحساب">
-    <div class="card"><h2>حالة العضوية</h2><p class="value">${e(status)}</p></div>
+    <div class="card"><h2>حالة العضوية</h2><p class="value">${e(status)}</p></div>${isAdmin ? '<div class="card"><h2>مستوى الوصول</h2><p class="value">مدير عام</p></div>' : ''}
     <div class="card"><h2>الأقسام المتاحة لك</h2><p class="value">${new Intl.NumberFormat('ar-SA').format(modules.length)}</p></div>
   </section>
   ${panels ? `<div class="page-tools"><label class="search-field" aria-label="البحث في أقسام اللوحة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${glyphs.search}</svg><input id="section-search" type="search" placeholder="ابحث عن خدمة أو قسم..." autocomplete="off"></label><span class="section-caption">اختر الخدمة المطلوبة من الأقسام المتاحة</span></div><p id="search-empty" class="search-empty" role="status">لا توجد خدمات مطابقة للبحث.</p>` : ''}
