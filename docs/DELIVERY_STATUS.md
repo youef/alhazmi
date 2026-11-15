@@ -1,9 +1,7 @@
-# Delivery state
-
-- ✅ V1 core genealogy database and initial security defaults.
-- ✅ V2 identity fingerprint/parts of name, historical residence, genealogist workflows, audit and conflict tables.
-- ✅ V3 household histories, membership cards, stable registry IDs, consent, grants, historical transfers, name variants, death workflows, scoped kinship cache.
-- ✅ All new V3 tables have RLS enabled and browser roles revoked by default.
-- ⏳ Not deployed or executed on a real Supabase project; migration needs staging integration tests.
-- ⏳ Website UI, digital QR endpoint, consent enforcement, household approval, full kinship calculation and role policies not yet implemented.
-- ⏳ Do not use real identities/private data until encryption, RLS authorization and retention/compliance review are complete.
+# حالة التسليم
+- ✅ مخطط V1 وV2 وV3 محفوظ في المستودع.
+- ✅ مخطط V4 للأجيال والأسر الممتدة وسجل الولاية والأرشيف والأمان وحسابات الأفراد مرفوع.
+- ✅ كل جداول V4 مقفلة عن الأدوار العميلة افتراضيًا باستخدام RLS وREVOKE.
+- ⏳ لا يوجد تشغيل SQL على Supabase ولا اختبارات على PostgreSQL متصل.
+- ⏳ إنشاء حساب فرد من عمر 15، تسليم رمز تفعيل من ولي الأمر، التحقق من الهوية، صفحة البروفايل، الدخول باسم المستخدم أو الهوية، وإعادة كلمة المرور: تصميم وقاعدة بيانات فقط وليست وظائف مشغّلة.
+- ⏳ فهرسة الأنساب والإحصاءات تحتاج وظائف خلفية تستعيد حسابها مع كل تعديل معتمد، مع اختبارات الخصوصية.
