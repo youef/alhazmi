@@ -70,6 +70,20 @@ async function familyData(user){
   const f=selected.find(v=>v.id===own?.family_unit_id);
   if(f&&!families.some(x=>x.id===f.id))families.push(f);
  }
+
+ const safeIds=families.map(v=>v.id);
+ let anchors=[];
+ if(safeIds.length){
+  const a=await pool.query(
+   "select p.id,p.full_name_ar name,p.family_unit_id from public.people p left join public.diwan_person_visibility_consents c on c.person_id=p.id and c.allowed_user_id=$2 and c.revoked_at is null where p.family_unit_id=any($1::uuid[]) and p.record_status='verified' and ($3::boolean or p.id=$4::uuid or p.visibility <> 'private' or coalesce(c.show_name,false)) order by p.full_name_ar limit 100",
+   [safeIds,user.id,admin,user.person_id||null]);
+  anchors=a.rows;
+ }
+ if(user.person_id&&!anchors.some(p=>p.id===user.person_id)){
+  const own=await pool.query("select id,full_name_ar name,family_unit_id from public.people where id=$1 and record_status='verified'",[user.person_id]);
+  if(own.rows.length)anchors.push(own.rows[0]);
+ }
+
  const pending=(await pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,f.name_ar family_name from public.diwan_family_relation_requests q join public.lineage_units f on f.id=q.family_unit_id where q.submitter_id=$1 order by q.created_at desc limit 70",[user.id])).rows;
  let relatives=[];
  if(user.person_id){
@@ -78,7 +92,7 @@ async function familyData(user){
    "select k.relation_kind,k.generation,case when p.id=$2 or p.visibility <> 'private' or coalesce(consent.show_name,false) then p.full_name_ar else null end display_name from public.diwan_family_kinship($2) k join public.people p on p.id=k.related_person_id left join public.diwan_person_visibility_consents consent on consent.person_id=p.id and consent.allowed_user_id=$1 and consent.revoked_at is null order by k.generation,k.relation_kind limit 250",
   [user.id,user.person_id])).rows;
  }
- return {admin,grants,invites,families,pending,relatives,personId:user.person_id};
+ return {admin,grants,invites,families,pending,relatives,anchors,personId:user.person_id};
 }
 function fingerprint(value,kind){
  const secret=process.env.DIWAN_ID_HMAC_KEY||process.env.NEON_AUTH_COOKIE_SECRET;
@@ -208,6 +222,7 @@ const operators={
 };
 export async function familyAction(user,request,form,area){
  csrf(user,request,form);
+ if(area==='admin')await adminCheck(user);
  const operation=txt(form.get('operation'),30),step=operators[operation];
  if(!step||step[0]!==area)reject('Unknown operation',404);
  if(step[2]&&!await authorized(user,step[2]))reject('Permission to manage this action required');
