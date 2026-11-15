@@ -94,7 +94,7 @@ test('admins can propose initial members without storing a raw national ID',asyn
 
 test('family rendering escapes names and exposes no sensitive identifier',()=>{
  const fake='<img src=x onerror=alert(1)>';
- const html=familyMemberView({invites:[],families:[],grants:[],pending:[{id:requestId,proposed_name_ar:fake,relationship:'self',family_name:'اختبار',status:'submitted'}],relatives:[],anchors:[],personId:null},'a'.repeat(64),false);
+ const html=familyMemberView({invites:[],families:[],grants:[],pending:[{id:requestId,proposed_name_ar:fake,relationship:'self',family_name:'اختبار',status:'submitted'}],relatives:[],anchors:[],consents:[],ownVerified:false,personId:null},'a'.repeat(64),false);
  assert.match(html,/&lt;img src=x onerror=alert\(1\)&gt;/);
  assert.doesNotMatch(html,/<img src=x onerror=/);
  const admin=familyAdminView({fakhths:[],families:[],parents:[],invitations:[],accounts:[],
