@@ -4,26 +4,28 @@
 -- Serializes writes affecting the ancestry graph so two concurrent requests
 -- cannot independently create cycles that each miss in the other's transaction.
 -- One transaction-scoped lock for all canonical parent and lineage topology writes.
+-- PostgreSQL fires triggers with the same event in alphabetical name order;
+-- aa_lock_* executes before integrity validation triggers.
 create or replace function public.lock_genealogy_graph()
 returns trigger language plpgsql set search_path='' as $$
 begin
  perform pg_catalog.pg_advisory_xact_lock(723145, 1);
  return new;
 end $$;
-drop trigger if exists lock_people_genealogy_graph on public.people;
-create trigger lock_people_genealogy_graph
+drop trigger if exists aa_lock_people_genealogy_graph on public.people;
+create trigger aa_lock_people_genealogy_graph
  before insert or update of father_id,mother_id on public.people
  for each row execute function public.lock_genealogy_graph();
-drop trigger if exists lock_lineage_genealogy_graph on public.lineage_units;
-create trigger lock_lineage_genealogy_graph
+drop trigger if exists aa_lock_lineage_genealogy_graph on public.lineage_units;
+create trigger aa_lock_lineage_genealogy_graph
  before insert or update of parent_id,tribe_id on public.lineage_units
  for each row execute function public.lock_genealogy_graph();
-drop trigger if exists lock_place_genealogy_graph on public.places;
-create trigger lock_place_genealogy_graph
+drop trigger if exists aa_lock_place_genealogy_graph on public.places;
+create trigger aa_lock_place_genealogy_graph
  before insert or update of parent_id on public.places
  for each row execute function public.lock_genealogy_graph();
-drop trigger if exists lock_group_genealogy_graph on public.family_groups;
-create trigger lock_group_genealogy_graph
+drop trigger if exists aa_lock_group_genealogy_graph on public.family_groups;
+create trigger aa_lock_group_genealogy_graph
  before insert or update of parent_group_id,extended_family_id on public.family_groups
  for each row execute function public.lock_genealogy_graph();
 
