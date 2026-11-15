@@ -1,0 +1,21 @@
+{
+  "name": "alhazmi-neon-functions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ./backend/neon/build.mjs",
+    "check": "node --check backend/neon/api.js && node --check backend/neon/uploads.js && node --check backend/neon/shared.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.900.0",
+    "@aws-sdk/s3-request-presigner": "^3.900.0",
+    "@neon/config": "^1.13.0",
+    "@neon/functions": "^0.8.0",
+    "jose": "^6.0.0",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
