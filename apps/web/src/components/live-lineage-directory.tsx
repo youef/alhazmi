@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { GitBranch, Search, ShieldCheck, RefreshCw, ChevronDown, ListFilter } from 'lucide-react';
 import type { Locale } from '@/lib/i18n';
 import { buildLineageTree, type LineageNode } from '@/lib/lineage-tree';
+import { loadApprovedLineage } from '@/lib/lineage-loader';
 import { getPublicLineage, type PublicUnit } from '@/lib/diwan-api';
 
 const types: Record<string, [string, string]> = {
@@ -22,12 +23,31 @@ function unitType(unit: PublicUnit, ar: boolean) {
   return types[unit.unit_type]?.[ar ? 0 : 1] ?? unit.unit_type;
 }
 
-function TreeNode({ node, ar }: { node: LineageNode; ar: boolean }) {
-  const label = <><GitBranch size={17} aria-hidden="true" /><strong>{unitName(node.unit, ar)}</strong><span className="unit-tag">{unitType(node.unit, ar)}</span></>;
-  return <li>{node.children.length ? <details>
-    <summary>{label}<ChevronDown size={17} className="tree-chevron" aria-hidden="true" /></summary>
-    <ul>{node.children.map(child => <TreeNode key={child.unit.id} node={child} ar={ar} />)}</ul>
-  </details> : <div className="tree-leaf">{label}</div>}</li>;
+function TreeNode({ node, ar, expanded, onToggle }: {
+  node: LineageNode;
+  ar: boolean;
+  expanded: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+}) {
+  const label = <>
+    <GitBranch size={17} aria-hidden="true" />
+    <strong>{unitName(node.unit, ar)}</strong>
+    <span className="unit-tag">{unitType(node.unit, ar)}</span>
+  </>;
+  if (!node.children.length) return <li><div className="tree-leaf">{label}</div></li>;
+
+  const open = expanded.has(node.unit.id);
+  return <li>
+    <button type="button" className="tree-toggle" aria-expanded={open} onClick={() => onToggle(node.unit.id)}>
+      {label}
+      <span className="tree-child-count">{node.children.length} {ar ? 'تابع' : 'children'}</span>
+      <ChevronDown size={17} className="tree-chevron" aria-hidden="true" />
+    </button>
+    {open && <ul id={`tree-children-${node.unit.id}`}>
+      {node.children.map(child =>
+        <TreeNode key={child.unit.id} node={child} ar={ar} expanded={expanded} onToggle={onToggle} />)}
+    </ul>}
+  </li>;
 }
 
 export function LiveLineageDirectory({ locale, view }: { locale: Locale; view: 'branches' | 'lineage' }) {
@@ -64,21 +84,35 @@ function DirectoryResults({ query, ar, view }: { query: string; ar: boolean; vie
   const [nonce, setNonce] = useState(0);
   const [pageError, setPageError] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     const controller = new AbortController();
-    getPublicLineage(0, controller.signal, query)
-      .then(page => { if (!controller.signal.aborted) { setItems(page.data); setNextOffset(page.meta.nextOffset); } })
-      .catch(() => { if (!controller.signal.aborted) setError(true); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    const fetchPage = (offset: number) => getPublicLineage(offset, controller.signal, query);
+    const load = view === 'lineage' && !query
+      ? loadApprovedLineage(fetchPage, (units, offset) => {
+          if (!controller.signal.aborted) { setItems(units); setNextOffset(offset); }
+        })
+      : fetchPage(0).then(page => ({ items: page.data, nextOffset: page.meta.nextOffset }));
+    load.then(result => {
+      if (!controller.signal.aborted) {
+        setItems(result.items);
+        setNextOffset(result.nextOffset);
+      }
+    }).catch(() => {
+      if (!controller.signal.aborted) setError(true);
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
     return () => controller.abort();
-  }, [nonce, query]);
+  }, [nonce, query, view]);
 
   function refresh() {
     setLoading(true);
     setError(false);
     setPageError(false);
     setItems([]);
+    setExpanded(new Set());
     setNextOffset(null);
     setNonce(value => value + 1);
   }
@@ -99,6 +133,14 @@ function DirectoryResults({ query, ar, view }: { query: string; ar: boolean; vie
   const tree = useMemo(() => showTree ? buildLineageTree(items) : [], [items, showTree]);
   const visibleItems = filter === 'all' ? items : items.filter(item => item.unit_type === filter);
   const names = new Map(items.map(item => [item.id, unitName(item, ar)]));
+  const toggleNode = (id: string) => setExpanded(previous => {
+    const updated = new Set(previous);
+    if (updated.has(id)) updated.delete(id);
+    else updated.add(id);
+    return updated;
+  });
+  const expandAll = () => setExpanded(new Set(items.map(item => item.id)));
+  const collapseAll = () => setExpanded(new Set());
 
   return <>
     <div className="directory-controls">
@@ -110,16 +152,29 @@ function DirectoryResults({ query, ar, view }: { query: string; ar: boolean; vie
           {Object.entries(types).map(([type, labels]) => <option key={type} value={type}>{labels[ar ? 0 : 1]}</option>)}
         </select>
       </label>}
+      {showTree && !loading && !error && items.length > 0 && <>
+        <button className="directory-retry" type="button" onClick={expandAll}>
+          {ar ? 'توسيع الكل' : 'Expand all'}
+        </button>
+        <button className="directory-retry" type="button" onClick={collapseAll}>
+          {ar ? 'طي الكل' : 'Collapse all'}
+        </button>
+      </>}
       <button className="directory-retry" type="button" onClick={refresh} disabled={loading || loadingMore}>
         <RefreshCw size={17} aria-hidden="true"/>{ar ? 'تحديث' : 'Refresh'}
       </button>
     </div>
-    {loading ? <p role="status" className="directory-state">{ar ? 'جارٍ تحميل البيانات المعتمدة من Neon...' : 'Loading approved Neon records...'}</p>
+    {loading ? <p role="status" className="directory-state">{ar
+        ? `جارٍ تحميل شجرة الأنساب المعتمدة… تم جلب ${items.length} وحدة.`
+        : `Loading approved lineage… ${items.length} units received.`}</p>
       : error ? <p role="alert" className="directory-state">{ar ? 'تعذر الوصول إلى خدمة البيانات. جرّب التحديث.' : 'The directory is unavailable. Try refreshing.'}</p>
       : items.length === 0 ? <p role="status" className="directory-state">{query ? (ar ? 'لا توجد نتائج مطابقة.' : 'No matching records.') : ar ? 'لا توجد وحدات نسب معتمدة للنشر حتى الآن؛ السجلات المستوردة تنتظر المراجعة.' : 'No lineage units have been approved for public publication yet.'}</p>
       : showTree ? <>
-        <p className="directory-caption">{ar ? 'اضغط على الفرع لتوسيع الوحدات التابعة. تظهر الشجرة بحسب السجلات التي جرى تحميلها.' : 'Open a branch to see its children. The tree reflects the records loaded so far.'}</p>
-        <ul className="unit-tree">{tree.map(node => <TreeNode key={node.unit.id} node={node} ar={ar} />)}</ul>
+        <p role="status" className="directory-caption">{ar
+          ? `${items.length} وحدة نسب معتمدة • ${tree.length} جذور في السجلات المحمّلة${nextOffset !== null ? ' • توجد صفحات أخرى' : ''}`
+          : `${items.length} approved units • ${tree.length} roots in loaded records${nextOffset !== null ? ' • More pages available' : ''}`}</p>
+        <ul className="unit-tree">{tree.map(node =>
+          <TreeNode key={node.unit.id} node={node} ar={ar} expanded={expanded} onToggle={toggleNode} />)}</ul>
       </>
       : visibleItems.length === 0 ? <p role="status" className="directory-state">{ar ? 'لا توجد وحدات من هذا النوع ضمن النتائج المحمَّلة.' : 'None of the loaded results match this type.'}</p>
       : <div className="directory-list">
