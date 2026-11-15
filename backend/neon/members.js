@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { accountFromId, authorized, HttpError, route } from './shared.js';
 import { accessibleModules, readModule } from './api.js';
+import { ADMIN_SECTIONS, adminAction, adminData, csrfFor } from './admin.js';
+import { adminView } from './admin-views.js';
 import { memberAuth } from './member-auth.js';
 import { authPage, dashboard, memberHome, moduleNames, modulePage, page, profilePage, portalScript } from './member-views.js';
 
@@ -163,6 +165,15 @@ export default {
       if (!user) return redirect(headers, '/login');
       const account = await accountFromId(user.id);
       const status = membershipStatus(account);
+      if (path === '/admin' || path.startsWith('/admin/')) {
+        const section = path === '/admin' ? 'overview' : path.slice('/admin/'.length);
+        if (!ADMIN_SECTIONS.includes(section)) return html(page('الصفحة غير موجودة', '<p>القسم الإداري غير موجود.</p>', true), 404);
+        if (request.method === 'POST') {
+          return redirect(headers, await adminAction(account, section, request, await readForm(request)));
+        }
+        const {data, filter} = await adminData(account, section, url);
+        return html(adminView(section, user, data, filter, csrfFor(account, request), url.searchParams.get('done') === '1'));
+      }
       if (path === '/dashboard' && request.method === 'GET') {
         const [modules, isAdmin] = await Promise.all([accessibleModules(account), authorized(account, 'roles.view')]);
         return html(dashboard(user, modules, status, isAdmin));
@@ -196,7 +207,7 @@ export default {
         headers.set('Retry-After', String(minute));
         return html(page('الخدمة غير متاحة', '<p>تعذّر إكمال الطلب. حاول مرة أخرى بعد قليل.</p>'), 503);
       }
-      return html(page('تعذّر إكمال الطلب', '<p>تأكد من صلاحية الحساب والبيانات المدخلة.</p>', [403, 404].includes(error.status)), error.status);
+      return html(page('تعذّر إكمال الطلب', '<p>' + (path.startsWith('/admin') ? 'لم ينفّذ الإجراء: ' + error.message.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])) : 'تأكد من صلاحية الحساب والبيانات المدخلة.') + '</p>', [403, 404].includes(error.status)), error.status);
     }
   },
 };
