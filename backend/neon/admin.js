@@ -1,5 +1,5 @@
 
-import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { authorized, HttpError, isId, pool } from './shared.js';
 
 export const ADMIN_SECTIONS=['overview','members','requests','services','claims','roles','audit','system'];
@@ -9,9 +9,9 @@ const guard=async(u,p='roles.view')=>{if(!await authorized(u,p))throw new HttpEr
 const number=x=>Number(x||0);
 export const csrfFor=(u,req)=>{
  const secret=process.env.NEON_AUTH_COOKIE_SECRET;
- const cookies=req.headers.get('cookie');
- if(!secret||!cookies)throw new HttpError(403,'Session required');
- return createHmac('sha256',secret).update('diwan-admin:'+u.id+':'+createHash('sha256').update(cookies).digest('hex')).digest('hex');
+ if(!secret||!req.headers.get('cookie'))throw new HttpError(403,'Session required');
+ // Session-independent token avoids failures if Neon Auth refreshes its HttpOnly cookie.
+ return createHmac('sha256',secret).update('diwan-admin:v2:'+u.id).digest('hex');
 };
 const verify=(u,req,token)=>{
  if(typeof token!=='string'||!/^[0-9a-f]{64}$/.test(token)||!timingSafeEqual(Buffer.from(csrfFor(u,req),'hex'),Buffer.from(token,'hex')))throw new HttpError(403,'Invalid security token');
@@ -118,7 +118,7 @@ async function changeService(db,u,f){
 }
 async function changeMember(db,u,f){
  const id=uid(f,'id'),state=clip(f.get('state'),20);
- if(!['suspended','active'].includes(state)||id===u.id)throw new HttpError(403,'Cannot change this account');
+ if(!['suspended','active'].includes(state)||id===u.id||f.get('confirm')!=='yes')throw new HttpError(403,'Cannot change this account without explicit confirmation');
  const exists=await db.query('select id from neon_auth."user" where id=$1 and "emailVerified" is true and banned is distinct from true',[id]);
  if(!exists.rows.length)throw new HttpError(404,'Verified member not found');
  const protectedUser=await db.query("select 1 from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id where a.user_id=$1 and r.is_system and a.scope_type='system' and a.revoked_at is null and a.approved_at is not null limit 1",[id]);
@@ -152,6 +152,7 @@ async function grantRole(db,u,f){
 }
 async function revokeRole(db,u,f){
  const id=uid(f,'id');
+ if(f.get('confirm')!=='yes')throw new HttpError(403,'Role revocation requires confirmation');
  const r=await db.query('update public.user_custom_role_assignments a set revoked_at=now() from public.custom_roles r where a.id=$1 and a.role_id=r.id and not r.is_system and a.revoked_at is null returning a.user_id',[id]);
  if(!r.rows.length)throw new HttpError(409,'Protected or revoked role');
  await auditWrite(db,u,'admin_role_revoked',{assignmentId:id},r.rows[0].user_id);
