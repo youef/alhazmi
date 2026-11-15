@@ -5,7 +5,7 @@ const css = `
 *{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--text);font:16px/1.7 system-ui,Tahoma,sans-serif;min-height:100vh}
 a{color:var(--accent)} header{background:var(--header);color:white}
 nav{max-width:1140px;margin:auto;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-nav a{color:inherit;text-decoration:none;padding-block:6px}nav>strong{margin-inline-end:auto;font-size:18px}nav form{margin:0}nav form button{background:transparent;border:1px solid #ffffff76;color:white}
+nav a{color:inherit;text-decoration:none;padding-block:6px}nav .brand{margin-inline-end:auto;font-size:18px;font-weight:800}nav form{margin:0}nav form button{background:transparent;border:1px solid #ffffff76;color:white}
 main{max-width:1140px;margin:auto;padding:clamp(16px,4vw,36px) 20px 60px}
 h1,h2,h3,p{margin:0}h1{font-size:clamp(1.65rem,4vw,2.5rem)}h2{font-size:1.25rem}h3{font-size:1rem}
 .hero,.card,.auth-card{padding:clamp(18px,4vw,28px);border:1px solid var(--line);background:var(--surface);border-radius:17px}
@@ -21,6 +21,24 @@ button{font:inherit;font-weight:700;padding:8px 14px;min-height:42px;border-radi
 .profile-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
 dl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px;margin:12px 0 0}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}
 .records{display:grid;gap:10px}.records article{padding:14px 18px}
+nav a,nav form button{min-height:44px;display:inline-flex;align-items:center}
+.member-hero{display:grid;gap:16px;padding:clamp(20px,5vw,44px);margin-bottom:17px;background:linear-gradient(125deg,#004a30,#076846);color:#fff;border-radius:18px}
+.member-hero p{color:#e5f6eb;margin-top:6px}
+.member-hero .status{display:inline-flex;align-items:center;gap:7px;background:#ffffff20;border:1px solid #ffffff65;color:white;border-radius:99px;padding:5px 12px;width:fit-content;font-size:.85rem}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.action-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:7px 15px;border-radius:9px;background:#00633d;color:white;text-decoration:none;font-weight:700}
+.member-hero .action-link{background:#f5dfa8;color:#263624}
+.action-link.secondary{background:var(--soft);color:var(--accent)}
+.overview{display:grid;gap:13px;margin-bottom:17px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.overview .card{padding:16px 20px}
+.overview h2{font-size:1rem}
+.overview .value{font-size:1.15rem;font-weight:800;color:var(--accent)}
+.tile-icon{display:grid;place-items:center;background:var(--soft);color:var(--accent);width:40px;height:40px;border-radius:10px}
+.tile-icon svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.section-heading{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;margin-top:18px}
+.remember{display:flex;align-items:center;gap:9px;font-size:.9rem;min-height:44px}
+.remember input{width:19px;min-height:19px;accent-color:#087047}
+.auth-card small{display:block;color:var(--muted)}
 :where(a,button,input):focus-visible{outline:3px solid #c29643;outline-offset:3px}
 `;
 
@@ -31,7 +49,7 @@ export function escapeHtml(value) {
 const e = escapeHtml;
 export function page(title, content, signedIn = false) {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${e(title)} | ديوان الحازمي</title><style>${css}</style></head>
-<body><header><nav aria-label="التنقل"><strong>ديوان الحازمي</strong><a href="${publicSite}">الموقع العام</a>
+<body><header><nav aria-label="التنقل"><a class="brand" href="/">ديوان الحازمي</a><a href="/">الرئيسية</a><a href="${publicSite}">الموقع العام</a>
 ${signedIn ? '<a href="/dashboard">لوحة التحكم</a><a href="/profile">الملف الشخصي</a><form method="post" action="/logout"><button type="submit">تسجيل الخروج</button></form>' : '<a href="/login">تسجيل الدخول</a>'}</nav></header>
 <main>${content}</main></body></html>`;
 }
@@ -52,14 +70,44 @@ const groups = [
   ['إدارة النظام والصلاحيات', ['forms','permissions','roles','audit','backups']],
 ];
 
-export function dashboard(user, modules) {
-  const panels = groups.map(([label, keys]) => {
+const glyphs = {
+  members: '<circle cx="12" cy="8" r="3"/><path d="M5 20v-2a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v2"/>',
+  review: '<path d="M5 4h14v16H5z M8 12l3 3 5-6"/>',
+  system: '<path d="M12 3l8 4v6c0 4-4 7-8 9-4-2-8-5-8-9V7z M9 12l2 2 4-4"/>',
+};
+const badge = status => `<span class="status">${e(status)}</span>`;
+const icon = key => `<span class="tile-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24">${glyphs[key]}</svg></span>`;
+
+export function memberHome(user, status) {
+  return page('الرئيسية', `<section class="member-hero">
+    <div><h1>بوابة ديوان الحازمي</h1><p>${user ? `مرحبًا، ${e(user.name)}` : 'ادخل إلى حسابك للاطلاع على خدمات العضوية والأقسام المتاحة لك.'}</p></div>
+    ${user ? badge(status) : ''}
+    <div class="actions">${user
+      ? '<a class="action-link" href="/dashboard">لوحة التحكم</a><a class="action-link secondary" href="/profile">الملف الشخصي</a>'
+      : '<a class="action-link" href="/login">تسجيل الدخول</a><a class="action-link secondary" href="/register">إنشاء حساب</a>'}</div>
+  </section>
+  <section class="overview">
+    <a class="card tile" href="${publicSite}ar/branches/">${icon('members')}<strong>دليل الأفخاذ والعوائل</strong><p>تصفّح الوحدات المعتمدة للنشر.</p></a>
+    <a class="card tile" href="${publicSite}ar/lineage/">${icon('review')}<strong>شجرة النسب</strong><p>استكشف تسلسل الفروع والعوائل.</p></a>
+    <a class="card tile" href="${publicSite}ar/archive/">${icon('system')}<strong>الوثائق والموروث</strong><p>اطّلع على الأرشيف العام.</p></a>
+  </section>`, Boolean(user));
+}
+
+export function dashboard(user, modules, status) {
+  const groupIcons = ['members', 'review', 'system'];
+  const panels = groups.map(([label, keys], index) => {
     const allowed = keys.filter(key => modules.includes(key));
-    return allowed.length ? `<section><h2>${label}</h2><div class="grid">${allowed.map(key =>
-      `<a class="tile card" href="/dashboard/${key}"><strong>${moduleNames[key]}</strong><span>عرض القسم ←</span></a>`).join('')}</div></section>` : '';
+    return allowed.length ? `<section><div class="section-heading"><h2>${label}</h2></div><div class="grid">${allowed.map(key =>
+      `<a class="tile card" href="/dashboard/${key}">${icon(groupIcons[index])}<strong>${moduleNames[key]}</strong><span>فتح القسم ←</span></a>`).join('')}</div></section>` : '';
   }).join('');
-  return page('لوحة التحكم', `<section class="hero"><h1>مرحبًا، ${e(user.name)}</h1><p>لوحة التحكم الخاصة بحسابك</p></section>
-${panels || '<section class="card"><h2>حسابك جاهز</h2><p>يمكنك تعديل ملفك الشخصي. تُتاح خدمات العضوية بعد ربط الحساب بسجل معتمد وتفعيله من الإدارة.</p><div class="tools"><a href="/profile">فتح الملف الشخصي</a></div></section>'}`, true);
+  return page('لوحة التحكم', `<section class="member-hero"><div><h1>لوحة التحكم</h1><p>مرحبًا، ${e(user.name)}</p></div>${badge(status)}
+    <div class="actions"><a class="action-link" href="/profile">الملف الشخصي</a><a class="action-link secondary" href="/">رئيسية البوابة</a></div>
+  </section>
+  <section class="overview" aria-label="نظرة عامة على الحساب">
+    <div class="card"><h2>حالة العضوية</h2><p class="value">${e(status)}</p></div>
+    <div class="card"><h2>الأقسام المتاحة لك</h2><p class="value">${new Intl.NumberFormat('ar-SA').format(modules.length)}</p></div>
+  </section>
+  ${panels || '<section class="card"><h2>ربط العضوية</h2><p>تُتاح خدمات العضوية بعد ربط الحساب بسجل معتمد وتفعيله من الإدارة. ملفك الشخصي متاح الآن.</p></section>'}`, true);
 }
 
 const fieldNames = {
@@ -95,7 +143,7 @@ ${items.length ? `<div class="records">${items.map(item => `<article class="card
 const emailField = '<label>البريد الإلكتروني<input name="email" type="email" autocomplete="email" maxlength="254" required></label>';
 const newPassword = '<label>كلمة المرور الجديدة<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label>';
 const authPages = {
-  login: ['تسجيل الدخول', emailField + '<label>كلمة المرور<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label>', 'دخول'],
+  login: ['تسجيل الدخول', emailField + '<label>كلمة المرور<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label><label class="remember"><input type="checkbox" name="rememberMe" value="yes" checked> تذكّر دخولي على هذا الجهاز</label><small>ألغِ التحديد إذا كنت تستخدم جهازًا مشتركًا.</small>', 'دخول'],
   register: ['إنشاء حساب', '<label>الاسم الظاهر<input name="name" autocomplete="name" maxlength="100" required></label>' + emailField + newPassword, 'إنشاء الحساب'],
   verify: ['تأكيد البريد الإلكتروني', emailField + '<label>رمز التأكيد<input name="otp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" required></label>', 'تأكيد البريد'],
   forgot: ['استعادة كلمة المرور', emailField, 'إرسال رابط الاستعادة'],
