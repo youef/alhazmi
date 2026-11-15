@@ -19,7 +19,7 @@ export function ancestryOf(id: string, units: PublicUnit[]): PublicUnit[] {
   let current: string | null = id;
   while (current && index.has(current) && !visited.has(current)) {
     visited.add(current);
-    const unit = index.get(current)!;
+    const unit: PublicUnit = index.get(current)!;
     path.push(unit);
     current = unit.parent_id;
   }
