@@ -44,15 +44,16 @@ async function chooseScope(user,roleList,familyId,anchorId,fakhthId,isAdmin){
 }
 async function inviteData(user){
  await adminCheck(user);
- const [fakhths,families,parents,invitations,accounts,queue]=await Promise.all([
+ const [fakhths,families,parents,invitations,accounts,queue,activeSupervisors]=await Promise.all([
   pool.query('select f.unit_id id,l.name_ar name,root.name_ar root from public.lineage_fakhths f join public.lineage_units l on l.id=f.unit_id join public.lineage_units root on root.id=f.major_branch_id order by root.name_ar,l.name_ar'),
   pool.query('select f.family_unit_id id,f.fakhth_unit_id fakhth_id,l.name_ar name from public.lineage_family_fakhth_links f join public.lineage_units l on l.id=f.family_unit_id order by l.name_ar limit 500'),
   pool.query("select p.id,p.full_name_ar name,p.family_unit_id family_id,f.fakhth_unit_id fakhth_id from public.people p join public.lineage_family_fakhth_links f on f.family_unit_id=p.family_unit_id where p.record_status='verified' order by p.full_name_ar limit 120"),
   pool.query('select id,invited_email,invited_name,role_key,fakhth_unit_id,family_unit_id,parent_person_id,created_at,accepted_at,expires_at,revoked_at from public.diwan_supervisor_invitations order by created_at desc limit 70'),
   pool.query('select id,email,name from neon_auth."user" where "emailVerified" is true order by "createdAt" desc limit 100'),
-  pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,q.proposed_notes,u.email,l.name_ar family_name,p.name_ar fakhth_name from public.diwan_family_relation_requests q join neon_auth.\"user\" u on u.id=q.submitter_id join public.lineage_units l on l.id=q.family_unit_id join public.lineage_units p on p.id=q.fakhth_unit_id order by q.created_at desc limit 70")
+  pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,q.proposed_notes,u.email,l.name_ar family_name,p.name_ar fakhth_name from public.diwan_family_relation_requests q join neon_auth.\"user\" u on u.id=q.submitter_id join public.lineage_units l on l.id=q.family_unit_id join public.lineage_units p on p.id=q.fakhth_unit_id order by q.created_at desc limit 70"),
+  pool.query("select a.id,a.user_id,a.scope_type,a.scope_unit_id,a.scope_person_id,a.expires_at,u.email,r.name_ar role_name from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id join neon_auth.\"user\" u on u.id=a.user_id where r.role_key=any($1::text[]) and a.revoked_at is null and a.approved_at is not null order by a.created_at desc limit 80",[roleKeys])
  ]);
- return {fakhths:fakhths.rows,families:families.rows,parents:parents.rows,invitations:invitations.rows,accounts:accounts.rows,queue:queue.rows};
+ return {fakhths:fakhths.rows,families:families.rows,parents:parents.rows,invitations:invitations.rows,accounts:accounts.rows,queue:queue.rows,activeSupervisors:activeSupervisors.rows};
 }
 async function familyData(user){
  const admin=await authorized(user,'roles.view');
@@ -120,6 +121,21 @@ async function createInvitation(db,user,form){
  }
  await audit(db,user,'diwan_supervisor_invited','diwan_supervisor_invitations',inserted.rows[0].id,{role,fakhth,family,parent});
 }
+
+async function revokeInvitation(db,user,form){
+ const invitation=id(txt(form.get('invite'),50));
+ const result=await db.query('update public.diwan_supervisor_invitations set revoked_at=now() where id=$1 and accepted_at is null and revoked_at is null returning id',[invitation]);
+ if(!result.rows.length)reject('No pending invitation found',409);
+ await audit(db,user,'diwan_supervisor_invitation_revoked','diwan_supervisor_invitations',invitation,{action:'revoke'});
+}
+async function revokeSupervision(db,user,form){
+ const assignment=id(txt(form.get('assignment'),50));
+ const result=await db.query(
+ "update public.user_custom_role_assignments a set revoked_at=now() from public.custom_roles r where a.id=$1 and a.role_id=r.id and r.role_key=any($2::text[]) and a.revoked_at is null returning a.id,a.user_id",
+ [assignment,roleKeys]);
+ if(!result.rows.length)reject('Active supervisor assignment not found',409);
+ await audit(db,user,'diwan_supervisor_assignment_revoked','user_custom_role_assignments',assignment,{targetUserId:result.rows[0].user_id});
+}
 async function acceptInvitation(db,user,form){
  const invite=id(txt(form.get('invite'),50));
  const email=await verifiedEmail(user);
@@ -147,9 +163,20 @@ async function requestFamilyPerson(db,user,form){
  const relation=txt(form.get('relationship'),60);
  const anchor=txt(form.get('anchor'),50)||null;
  if(!relations.includes(relation))reject('Unsupported family connection',400);
+ if(relation!=='self'&&!anchor)reject('Select the related person before adding a spouse, child or relative',400);
+ if(relation==='self'&&anchor)reject('Initial records must not have a relationship anchor',400);
  if(anchor)id(anchor);
  const admin=await authorized(user,'roles.view'),roles=await grantRows(user);
  const scope=await chooseScope(user,roles,familyId,anchor,fakhthId,admin);
+ if(anchor&&!admin){
+  const validPerson=await db.query("select p.id,p.family_unit_id,lf.fakhth_unit_id from public.people p left join public.lineage_family_fakhth_links lf on lf.family_unit_id=p.family_unit_id where p.id=$1 and p.record_status='verified'",[anchor]);
+  if(!validPerson.rows.length)reject('Anchor must be a verified person');
+  const isParent=roles.some(g=>g.role_key==='diwan_parent_supervisor'&&g.scope_person_id===user.person_id&&g.scope_type==='self');
+  const isFamily=roles.some(g=>g.role_key==='diwan_family_supervisor'&&g.scope_unit_id===familyId&&g.scope_type==='family');
+  const isFakhth=roles.some(g=>g.role_key==='diwan_fakhth_supervisor'&&g.scope_unit_id===fakhthId&&g.scope_type==='unit');
+  if(!isParent && !(isFamily && validPerson.rows[0].family_unit_id===familyId) && !(isFakhth && validPerson.rows[0].fakhth_unit_id===fakhthId))
+    reject('Cannot propose a link to an unrelated family');
+ }
  const name=txt(form.get('full_name'),200);
  if(name.length<3)reject('Full name is required',400);
  const gender=txt(form.get('gender'),20)||'unknown';
@@ -158,6 +185,15 @@ async function requestFamilyPerson(db,user,form){
  const dob=txt(form.get('birth_date'),12)||null;
  if(dob&&!/^\d{4}-\d{2}-\d{2}$/.test(dob))reject('Date must be YYYY-MM-DD',400);
  const notes=txt(form.get('notes'),1000);
+ const details={
+  father_name_ar:txt(form.get('father_name'),150),
+  mother_name_ar:txt(form.get('mother_name'),150),
+  birthplace:txt(form.get('birthplace'),120),
+  nationality:txt(form.get('nationality'),80),
+  record_reference:txt(form.get('record_reference'),200)
+ };
+ if(Object.values(details).some(value=>/[<>]/.test(value)))reject('Remove markup from biographical fields',400);
+
  const kind=txt(form.get('identifier_type'),50);
  const identity=txt(form.get('identity_number'),60);
  if(Boolean(kind)!==Boolean(identity))reject('Identifier type and number must both be supplied',400);
@@ -170,8 +206,8 @@ async function requestFamilyPerson(db,user,form){
   const prior=await db.query("select 1 from public.diwan_family_relation_requests where identifier_digest=$1 and submitter_id=$2 and status in ('submitted','under_review','needs_evidence') limit 1",[hashed.digest,user.id]);
   if(prior.rows.length)reject('A request for this identifier is already under review',409);
  }
- const result=await db.query("insert into public.diwan_family_relation_requests(tribe_id,family_unit_id,fakhth_unit_id,submitter_id,anchor_person_id,linked_person_id,relationship,proposed_name_ar,proposed_gender,proposed_birth_date,proposed_birth_precision,identifier_type,identifier_digest,identifier_last4,proposed_notes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id",
-  [scope.tribe_id,familyId,fakhthId,user.id,anchor,existing,relation,name,gender,dob,dob?'day':'unknown',kind||null,hashed?.digest||null,hashed?.last4||null,notes||null]);
+ const result=await db.query("insert into public.diwan_family_relation_requests(tribe_id,family_unit_id,fakhth_unit_id,submitter_id,anchor_person_id,linked_person_id,relationship,proposed_name_ar,proposed_gender,proposed_birth_date,proposed_birth_precision,identifier_type,identifier_digest,identifier_last4,proposed_notes,proposed_details) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb) returning id",
+  [scope.tribe_id,familyId,fakhthId,user.id,anchor,existing,relation,name,gender,dob,dob?'day':'unknown',kind||null,hashed?.digest||null,hashed?.last4||null,notes||null,JSON.stringify(details)]);
  const recordId=result.rows[0].id;
  await db.query("insert into public.notifications(user_id,category,title,body,related_record_id) select distinct a.user_id,'lineage','طلب مراجعة عائلية جديد','وصل اقتراح إضافة شخص أو ربط قرابة؛ يتطلب مراجعة الإدارة.',$1 from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id where r.role_key='diwan_super_admin' and r.role_state='active' and a.scope_type='system' and a.revoked_at is null and a.approved_at is not null",[recordId]);
  await audit(db,user,'diwan_family_relation_submitted','diwan_family_relation_requests',recordId,{relation,fakhthId,familyId,containsIdentifier:!!hashed});
@@ -216,6 +252,8 @@ async function reviewFamilyPerson(db,user,form){
 }
 const operators={
  invite:['admin',createInvitation,'roles.assign'],
+ revoke_invite:['admin',revokeInvitation,'roles.assign'],
+ revoke_supervision:['admin',revokeSupervision,'roles.assign'],
  review:['admin',reviewFamilyPerson,'identity.edit'],
  accept:['family',acceptInvitation,null],
  submit:['family',requestFamilyPerson,null],
