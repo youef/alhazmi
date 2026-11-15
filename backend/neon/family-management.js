@@ -87,6 +87,7 @@ async function familyData(user){
  }
 
  const pending=(await pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,f.name_ar family_name from public.diwan_family_relation_requests q join public.lineage_units f on f.id=q.family_unit_id where q.submitter_id=$1 order by q.created_at desc limit 70",[user.id])).rows;
+ const ownVerified=user.person_id?!!(await pool.query("select 1 from public.people where id=$1 and record_status='verified'",[user.person_id])).rows.length:false;
  const consents=user.person_id?(await pool.query("select c.allowed_user_id,u.email from public.diwan_person_visibility_consents c join neon_auth.\"user\" u on u.id=c.allowed_user_id where c.person_id=$1 and c.revoked_at is null order by c.consent_at desc limit 60",[user.person_id])).rows:[];
   let relatives=[];
  if(user.person_id){
@@ -95,7 +96,7 @@ async function familyData(user){
    "select k.relation_kind,k.generation,case when p.id=$2 or p.visibility <> 'private' or coalesce(consent.show_name,false) then p.full_name_ar else null end display_name from public.diwan_family_kinship($2) k join public.people p on p.id=k.related_person_id left join public.diwan_person_visibility_consents consent on consent.person_id=p.id and consent.allowed_user_id=$1 and consent.revoked_at is null order by k.generation,k.relation_kind limit 250",
   [user.id,user.person_id])).rows;
  }
- return {admin,grants,invites,families,pending,relatives,anchors,consents,personId:user.person_id};
+ return {admin,grants,invites,families,pending,relatives,anchors,consents,ownVerified,personId:user.person_id};
 }
 function fingerprint(value,kind){
  const secret=process.env.DIWAN_ID_HMAC_KEY||process.env.NEON_AUTH_COOKIE_SECRET;
