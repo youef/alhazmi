@@ -41,10 +41,28 @@ test('anonymous users are redirected from protected pages', async () => {
   assert.match(response.headers.get('cache-control'), /no-store/);
 });
 
+test('same-origin form submissions reach Neon Auth', async () => {
+  const login = await members.fetch(new Request(`${origin}/login`));
+  assert.equal(login.headers.get('referrer-policy'), 'same-origin');
+  globalThis.fetch = async (url, options) => {
+    assert.equal(new URL(url).pathname, '/auth/sign-in/email');
+    assert.equal(new Headers(options.headers).get('origin'), origin);
+    return Response.json({ code: 'INVALID_EMAIL_OR_PASSWORD' }, { status: 401 });
+  };
+  const response = await members.fetch(new Request(`${origin}/login`, {
+    method: 'POST', headers: { Origin: origin },
+    body: new URLSearchParams({ email: 'test@example.test', password: 'test-password' }),
+  }));
+  assert.equal(response.status, 401);
+  assert.match(await response.text(), /تعذّر تسجيل الدخول/);
+});
+
 test('cross-origin forms cannot log in or sign out', async () => {
   for (const path of ['/login', '/logout', '/profile']) {
-    const response = await members.fetch(new Request(origin + path, { method: 'POST', headers: { Origin: 'https://other.example.test' } }));
-    assert.equal(response.status, 403);
+    for (const headers of [{ Origin: 'https://other.example.test' }, { Origin: 'null' }, {}]) {
+      const response = await members.fetch(new Request(origin + path, { method: 'POST', headers }));
+      assert.equal(response.status, 403);
+    }
   }
 });
 
