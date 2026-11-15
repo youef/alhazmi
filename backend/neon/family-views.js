@@ -57,7 +57,7 @@ const css=[
 const form=(action,operation,csrf,body,button)=>
  '<form class="family-form" method="post" action="'+e(action)+'"><input type="hidden" name="csrf" value="'+e(csrf)+'"><input type="hidden" name="operation" value="'+e(operation)+'">'+body+'<button class="family-btn" type="submit">'+e(button)+'</button></form>';
 const options=(items,key,label,emptyLabel='اختر من القائمة')=>
- '<option value="">'+e(emptyLabel)+'</option>'+items.map(x=>'<option value="'+e(x[key])+'">'+e(label(x))+'</option>').join('');
+ '<option value="">'+e(emptyLabel)+'</option>'+items.map(x=>'<option value="'+e(x[key])+'"'+(x.fakhth_id?' data-fakhth="'+e(x.fakhth_id)+'"':'')+(x.family_id?' data-family="'+e(x.family_id)+'"':'')+'>'+e(label(x))+'</option>').join('');
 const select=(label,name,rows,key,text,required=false)=>
  '<label>'+e(label)+'<select class="family-selectlong" name="'+e(name)+'" '+(required?'required':'')+'>'+options(rows,key,text)+'</select></label>';
 const pills=x=>'<span class="family-pill '+(x==='rejected'?'negative':x==='needs_evidence'?'warning':'')+'">'+e(status[x]||x||'—')+'</span>';
@@ -74,7 +74,12 @@ export function familyAdminView(data,csrf,done){
  const pendingInvites=data.invitations.map(i=>row([
   '<b dir="ltr">'+e(i.invited_email)+'</b><div class="family-slim">'+e(i.invited_name||'')+'</div>',
   e(status[i.role_key]),e(i.fakhth_unit_id?data.fakhths.find(x=>x.id===i.fakhth_unit_id)?.name:'—'),
-  i.revoked_at?pills('rejected'):i.accepted_at?pills('approved'):pills('submitted'),e(date(i.created_at))
+  i.revoked_at?pills('rejected'):i.accepted_at?pills('approved'):pills('submitted'),e(date(i.created_at)),
+  !i.revoked_at&&!i.accepted_at?form('/admin/supervisors','revoke_invite',csrf,'<input type="hidden" name="invite" value="'+e(i.id)+'">','إلغاء الدعوة'):'—'
+ ]));
+ const supervisors=(data.activeSupervisors||[]).map(a=>row([
+  e(a.email),e(a.role_name),e(a.scope_type),e(date(a.expires_at)),
+  form('/admin/supervisors','revoke_supervision',csrf,'<input type="hidden" name="assignment" value="'+e(a.id)+'">','سحب الإشراف')
  ]));
  const queue=data.queue.map(q=>{
   const open=['submitted','under_review','needs_evidence'].includes(q.status);
@@ -94,7 +99,8 @@ export function familyAdminView(data,csrf,done){
  +'<div class="family-stats"><div class="family-stat"><strong>'+fmt(data.fakhths.length)+'</strong><small>الأفخاذ المسجلة</small></div><div class="family-stat"><strong>'+fmt(data.families.length)+'</strong><small>العائلات المرتبطة</small></div><div class="family-stat"><strong>'+fmt(data.queue.filter(x=>['submitted','under_review','needs_evidence'].includes(x.status)).length)+'</strong><small>طلبات حديثة بانتظار القرار</small></div></div>'
  +'<div class="family-grid"><section class="family-card"><h2>إضافة مستخدم ومنح نطاق إشراف</h2><p class="family-sub">اختر الفخذ الموجود فعلًا، ثم عائلة منه للمستويين الثاني والثالث.</p>'+form('/admin/supervisors','invite',csrf,inviteFields,'إنشاء دعوة إشراف')+'</section>'
  +'<section class="family-card"><h2>حسابات المستخدمين المسجلة</h2>'+table(['المستخدم','البريد'],data.accounts.map(u=>row([e(u.name||'مستخدم'),'<span dir="ltr">'+e(u.email)+'</span>'])))+'</section></div>'
- +'<section class="family-card"><h2>سجل دعوات الإشراف</h2>'+table(['الحساب','الدور','الفخذ','الحالة','أنشئت'],pendingInvites)+'</section>'
+ +'<section class="family-card"><h2>سجل دعوات الإشراف</h2>'+table(['الحساب','الدور','الفخذ','الحالة','أنشئت','إلغاء'],pendingInvites)+'</section>'
+ +'<section class="family-card"><h2>المشرفون الفعّالون وسحب صلاحياتهم</h2>'+table(['المستخدم','الدور','النطاق','ينتهي','الإجراء'],supervisors)+'</section>'
  +'<section class="family-card"><h2>مراجعة إضافات الأسرة والقرابة</h2><p class="family-callout family-warning">رقم الهوية وحده لا يثبت النسب. القبول الأولي ينشئ سجلًا خاصًا قيد التحقق، وروابط الأبوة أو الزواج تبقى غير موثّقة حتى مراجعتها.</p>'+table(['الاسم','صلة القرابة','النطاق','مقدم الطلب','الحالة','الإجراء'],queue)+'</section>'
  +'<div class="family-actions"><a class="family-btn secondary" href="/admin">العودة للإدارة</a><a class="family-btn secondary" href="/family/manage">بوابة إدارة الأسرة</a></div></div>';
  return page('مشرفو الأفخاذ والعوائل', '<style>'+css+'</style>'+content,true);
@@ -114,6 +120,11 @@ export function familyMemberView(data,csrf,done){
  +'<label>الاسم الكامل<input name="full_name" required minlength="3" maxlength="200" placeholder="الاسم حسب المستندات"></label>'
  +'<label>الجنس<select name="gender"><option value="unknown">غير محدد</option><option value="male">ذكر</option><option value="female">أنثى</option><option value="undisclosed">غير معلن</option></select></label>'
  +'<label>تاريخ الميلاد (اختياري)<input type="date" name="birth_date"></label>'
+ +'<label>اسم الأب في المستند (اختياري)<input name="father_name" maxlength="150"></label>'
+ +'<label>اسم الأم في المستند (اختياري)<input name="mother_name" maxlength="150"></label>'
+ +'<label>مكان الميلاد (اختياري)<input name="birthplace" maxlength="120"></label>'
+ +'<label>الجنسية (اختياري)<input name="nationality" maxlength="80"></label>'
+ +'<label>رقم/مرجع المستند دون تفاصيل حساسة<input name="record_reference" maxlength="200"></label>'
  +'<label>نوع الوثيقة (اختياري)<select name="identifier_type"><option value="">لا توجد وثيقة الآن</option><option value="national_id">هوية وطنية</option><option value="residency">إقامة</option><option value="passport">جواز سفر</option><option value="birth_certificate">شهادة ميلاد</option></select></label>'
  +'<label>رقم الوثيقة للمطابقة فقط (اختياري)<input name="identity_number" type="text" inputmode="numeric" maxlength="18" autocomplete="off" placeholder="يتحول لبصمة آمنة ولا يُحفظ الرقم الأصلي"></label>'
  +'<label>الملاحظات أو مصدر العلاقة<textarea name="notes" maxlength="1000" rows="3" placeholder="اذكر المستند أو مصدر صلة القرابة"></textarea></label>'
