@@ -1,12 +1,13 @@
+import { SectionHeader } from '@/components/section-header';
 import { notFound } from 'next/navigation';
 import { LiveLineageDirectory } from '@/components/live-lineage-directory';
-import { getDictionary, isLocale } from '@/lib/i18n';
+import { isLocale } from '@/lib/i18n';
 export default async function LineagePage({ params }: { params: Promise<{ locale: string }> }) {
  const { locale } = await params;
  if (!isLocale(locale)) notFound();
- const t = getDictionary(locale);
  return <main id="main-content" className="container inner-page">
-   <h1>{t.lineageTitle}</h1><p className="inner-lead">{t.lineageDesc}</p>
+   <SectionHeader locale={locale} section="lineage" title={locale === 'ar' ? 'شجرة وحدات النسب' : 'Lineage unit tree'}
+     description={locale === 'ar' ? 'تصفّح التسلسل بين الفروع والأفخاذ والعوائل المصرّح بنشرها.' : 'Explore the hierarchy of branches and families approved for publication.'} />
    <LiveLineageDirectory locale={locale} view="lineage" />
  </main>;
 }
