@@ -14,10 +14,11 @@ export type PublicLineagePage = {
   meta: { limit: number; offset: number; nextOffset: number | null; reviewStatus: 'approved' };
 };
 
-export async function getPublicLineage(offset = 0, signal?: AbortSignal): Promise<PublicLineagePage> {
+export async function getPublicLineage(offset = 0, signal?: AbortSignal, search = ''): Promise<PublicLineagePage> {
   const url = new URL('/v1/public/lineage', API_BASE);
   url.searchParams.set('limit', '50');
   url.searchParams.set('offset', String(offset));
+  if (search) url.searchParams.set('q', search);
   const response = await fetch(url, { method: 'GET', signal, mode: 'cors', credentials: 'omit', cache: 'no-store' });
   if (!response.ok) throw new Error(`API_NOT_READY_${response.status}`);
   const payload: unknown = await response.json();
