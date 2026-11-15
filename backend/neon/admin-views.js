@@ -132,8 +132,16 @@ function requestList(data,filter,csrf){
 }
 function serviceList(data,filter,csrf){
  const rows=data.rows.map(s=>tr(['<strong>'+e(s.title_ar)+'</strong><div class="adm-muted" dir="ltr">'+e(s.service_key)+'</div>',status(s.status),e(s.visibility),rowTime(s.created_at),['draft','active'].includes(s.status)?form('services',csrf,'change_service',h('id',s.id)+h('expected',s.status)+h('next',s.status==='active'?'draft':'active'),s.status==='active'?'إرجاع للمسودة':'نشر الخدمة'):'<span class="adm-muted">مؤرشفة</span>']));
- const backlog=table(['الخدمة','مقدم الطلب','الحالة','التاريخ'],data.backlog.map(r=>tr([e(r.title_ar||'خدمة'),e(r.email||'عضو'),status(r.state),rowTime(r.created_at)])));
- return card('كتالوج الخدمات',filters('services',filter,['draft','active','retired'])+table(['الخدمة','الحالة','الظهور','التاريخ','النشر'],rows)+pager('services',filter,data))+card('أحدث طلبات الخدمات',backlog);
+ const backdrop=data.backlog.map(r=>{
+  const inProgress=['submitted','in_review','needs_evidence','approved'].includes(r.state);
+  const choices=r.state==='approved'?'<option value="completed">تم تنفيذ الخدمة</option>':'<option value="in_review">قيد المراجعة</option><option value="needs_evidence">طلب إثبات</option><option value="approved">اعتماد القرار</option><option value="rejected">رفض الطلب</option>';
+  const actions=inProgress?'<details class="adm-detail"><summary>مراجعة الطلب</summary>'+form('services',csrf,'review_service',h('id',r.id)+h('expected',r.state)+'<label>القرار<select name="next">'+choices+'</select></label><label>ملاحظات القرار<textarea name="note" minlength="10" maxlength="500" rows="2" required></textarea></label>','تسجيل قرار الخدمة')+'</details>':'<span class="adm-muted">مغلق</span>';
+  return tr([e(r.title_ar||'خدمة'),e(r.email||'عضو'),status(r.state),rowTime(r.created_at),actions]);
+ });
+ const creation=form('services',csrf,'create_service','<label>عنوان الخدمة<input name="title" maxlength="120" minlength="3" placeholder="مثال: إصدار شهادة عضوية" required></label><label>مفتاح الخدمة<input name="key" dir="ltr" placeholder="members.certificate" pattern="[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+" maxlength="90" required></label><label>الوصف<textarea name="description" rows="3" maxlength="600"></textarea></label><label>مستوى الوصول<select name="visibility"><option value="authenticated">كل عضو مسجل</option><option value="authorized_family">أفراد الأسرة المخوّلون</option><option value="admins">الإدارة فقط</option></select></label><p class="adm-note">ستُنشأ الخدمة كمسودة ولا تُنشر حتى تعتمدها.</p>','إنشاء الخدمة');
+ return card('كتالوج الخدمات',filters('services',filter,['draft','active','retired'])+table(['الخدمة','الحالة','الظهور','التاريخ','النشر'],rows)+pager('services',filter,data))
+  +card('أحدث طلبات الخدمات',table(['الخدمة','مقدم الطلب','الحالة','التاريخ','المراجعة'],backdrop))
+  +card('إنشاء خدمة جديدة',creation);
 }
 function claimsList(data,filter,csrf){
  const rows=data.rows.map(c=>{
@@ -152,7 +160,7 @@ function roleList(data,csrf){
  const assign=canAssign?form('roles',csrf,'grant_role','<label>الدور<select name="role" required>'+roleOptions+'</select></label><label>الحساب<select name="target" required>'+members+'</select></label><label>النطاق القبلي<select name="tribe" required>'+tribes+'</select></label>','منح الدور'):'<p class="adm-note">يلزم إنشاء دور مخصص مع وجود مستخدم مؤكد وقبيلة معتمدة قبل منح الصلاحية.</p>';
  const permitted=data.permissions.map(p=>'<label><input type="checkbox" name="permission" value="'+e(p.id)+'"><span>'+e(p.display_name_ar||p.permission_key)+' <small class="adm-muted" dir="ltr">'+e(p.permission_key)+'</small></span></label>').join('');
  const create=form('roles',csrf,'create_role','<label>اسم الدور بالعربية<input name="name" required minlength="3" maxlength="100" placeholder="مثال: مشرف الطلبات"></label><label>مفتاح الدور بالإنجليزية<input name="key" required pattern="[a-z][a-z0-9_-]{1,63}" maxlength="64" placeholder="requests_supervisor" dir="ltr"></label><p class="adm-note">صلاحيات عادية وحساسة فقط؛ صلاحيات النظام الحرجة لا يمكن تفويضها من هذه الواجهة.</p><div class="adm-options">'+permitted+'</div>','إنشاء دور معتمد');
- const assigned=data.assignments.map(a=>tr([e(a.email),e(a.name_ar),e(a.scope_type),rowTime(a.approved_at),a.is_system?'<span class="adm-badge good">محمي</span>':form('roles',csrf,'revoke_role',h('id',a.id)+'<label><input type="checkbox" name="confirm" value="yes" required> أؤكد الإلغاء</label>','سحب التفويض',true)]));
+ const assigned=data.assignments.map(a=>tr([e(a.email),e(a.name_ar),e(a.scope_type)+'<div class="adm-muted">حتى '+date(a.expires_at)+'</div>',rowTime(a.approved_at),a.is_system?'<span class="adm-badge good">محمي</span>':form('roles',csrf,'revoke_role',h('id',a.id)+'<label><input type="checkbox" name="confirm" value="yes" required> أؤكد الإلغاء</label>','سحب التفويض',true)]));
  return card('الأدوار الحالية',table(['الدور','النوع','الحالة','الصلاحيات','النطاق'],rows))+'<div class="adm-two">'+card('إنشاء دور مخصص',create)+card('تفويض دور لمستخدم',assign)+'</div>'+card('التفويضات الفعّالة',table(['المستخدم','الدور','النطاق','تاريخ الاعتماد','الإجراء'],assigned));
 }
 function auditList(data,filter){
