@@ -40,6 +40,59 @@ nav a,nav form button{min-height:44px;display:inline-flex;align-items:center}
 .remember input{width:19px;min-height:19px;accent-color:#087047}
 .auth-card small{display:block;color:var(--muted)}
 :where(a,button,input):focus-visible{outline:3px solid #c29643;outline-offset:3px}
+
+/* Diwan design system: government-service inspired, independent identity */
+:root{--canvas:#f3f6f5;--surface:#fff;--text:#16372b;--muted:#62746b;--line:#dce8e1;--accent:#006b45;--soft:#e8f5ee;--header:#06452f;--gold:#c8a35d}
+body{font-family:Tahoma,"Segoe UI",system-ui,sans-serif;line-height:1.8}
+header{background:#fff;color:#183a2c;border-bottom:1px solid var(--line);box-shadow:0 2px 14px #0b382b09;position:sticky;top:0;z-index:10}
+header:before{content:"";display:block;height:5px;background:linear-gradient(90deg,#0a6e49,#d5b56c,#0a6e49)}
+nav{max-width:1250px;gap:5px 12px;padding:10px 20px}
+nav .brand{display:flex;align-items:center;gap:10px;color:#064a30;font-weight:900;font-size:1.14rem}
+.brand-mark{width:43px;height:43px;display:grid;place-items:center;border-radius:13px;color:#fff;background:#086343}
+.brand-mark svg{width:24px;height:24px}
+nav a:not(.brand){border-radius:9px;padding:7px 11px;font-weight:650;color:#3c5649;font-size:.9rem}
+nav a:hover,nav a[aria-current]{background:#e9f6ef;color:#065f3c}
+nav form button{border-color:#d7e5dc;color:#9a2c2c;padding:5px 12px}
+main{max-width:1250px;padding-top:26px}
+h1,h2,h3{letter-spacing:-.02em}
+.hero,.card,.auth-card{box-shadow:0 5px 30px #0a342b08;border-radius:17px}
+.member-hero{border-radius:23px;position:relative;overflow:hidden;background:linear-gradient(112deg,#06432e,#087850 85%);box-shadow:0 18px 35px #03462b26}
+.member-hero:after{content:"";position:absolute;inset-inline-end:-50px;inset-block-end:-100px;width:300px;height:300px;border:1px solid #ffffff32;border-radius:50%;box-shadow:0 0 0 55px #ffffff08,0 0 0 105px #ffffff07;pointer-events:none}
+.member-hero>*{position:relative;z-index:1}
+.member-hero h1{font-size:clamp(1.9rem,4vw,2.65rem)}
+.member-hero .status{border-color:#ffffff40}
+.action-link{border-radius:11px;transition:transform .15s,box-shadow .15s}
+.action-link:hover{transform:translateY(-2px);box-shadow:0 8px 16px #032c1c26}
+.member-hero .action-link.secondary{background:#ffffff22;color:#fff;border:1px solid #ffffff55}
+.overview{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
+.overview .card{border-inline-start:4px solid #08704c}
+.overview .value{font-size:1.5rem}
+.grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,225px),1fr));gap:14px}
+.tile{min-height:154px;gap:8px;transition:transform .16s,border-color .16s,box-shadow .16s}
+.tile:hover{transform:translateY(-3px);box-shadow:0 11px 23px #08422b16}
+.tile strong{font-size:1.02rem}
+.tile-icon{width:48px;height:48px;border-radius:14px}
+.tile-icon svg{width:25px;height:25px}
+.section-heading{margin:24px 0 10px}
+.section-heading h2{font-size:1.25rem}
+.section-heading small{color:var(--muted)}
+.page-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 20px}
+.search-field{display:flex;align-items:center;gap:8px;min-width:min(100%,280px);flex:1;max-width:520px;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding-inline:13px}
+.search-field input{background:transparent;border:0;outline:none;min-width:0}
+.search-field:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px #087b4920}
+.search-field svg{width:20px;height:20px;color:var(--accent)}
+.search-empty{display:none;padding:25px;text-align:center;color:var(--muted)}
+.auth-card{margin:5vh auto;overflow:hidden;position:relative}
+.auth-card:before{content:"";height:5px;display:block;position:absolute;top:0;right:0;left:0;background:linear-gradient(90deg,#076e47,#d1ad6e)}
+.auth-card button,.profile-form button{background:#006a43}
+.auth-card button:hover,.profile-form button:hover{background:#075638}
+.auth-card input:not([type=checkbox]),.profile-form input{border-radius:11px}
+.auth-card h1{color:var(--accent)}
+.records article:hover{border-color:var(--accent)}
+.section-caption{font-size:.85rem;color:var(--muted)}
+@media(max-width:650px){nav{gap:2px 5px}nav .brand{width:100%;margin-bottom:5px}nav a:not(.brand){font-size:.8rem;padding-inline:8px}nav form button{font-size:.8rem}.member-hero{padding:24px}.overview .value{font-size:1.2rem}main{padding-inline:14px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.tile{padding:13px;min-height:140px}.tile strong{font-size:.88rem}.tile-icon{width:40px;height:40px}.tile-icon svg{width:21px;height:21px}}
+@media(max-width:360px){.grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.tile,.action-link{transition:none}.tile:hover,.action-link:hover{transform:none}}
 `;
 
 export function escapeHtml(value) {
@@ -47,11 +100,12 @@ export function escapeHtml(value) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
 const e = escapeHtml;
+export const portalScript = "document.addEventListener('DOMContentLoaded',()=>{const search=document.getElementById('section-search');if(!search)return;const cards=[...document.querySelectorAll('[data-module-group] .tile')];const empty=document.getElementById('search-empty');search.addEventListener('input',()=>{const q=search.value.trim().toLocaleLowerCase('ar');let total=0;cards.forEach(card=>{const show=card.textContent.toLocaleLowerCase('ar').includes(q);card.hidden=!show;if(show)total++});document.querySelectorAll('[data-module-group]').forEach(group=>{group.hidden=![...group.querySelectorAll('.tile')].some(card=>!card.hidden)});empty.style.display=total?'none':'block'})});";
 export function page(title, content, signedIn = false) {
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${e(title)} | ديوان الحازمي</title><style>${css}</style></head>
-<body><header><nav aria-label="التنقل"><a class="brand" href="/">ديوان الحازمي</a><a href="/">الرئيسية</a><a href="${publicSite}">الموقع العام</a>
+<body><header><nav aria-label="التنقل"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 3 7v11l9 4 9-4V7z M8 15l4-8 4 8 M9 13h6"/></svg></span><span>ديوان الحازمي</span></a><a href="/">الرئيسية</a><a href="${publicSite}">الموقع العام</a>
 ${signedIn ? '<a href="/dashboard">لوحة التحكم</a><a href="/profile">الملف الشخصي</a><form method="post" action="/logout"><button type="submit">تسجيل الخروج</button></form>' : '<a href="/login">تسجيل الدخول</a>'}</nav></header>
-<main>${content}</main></body></html>`;
+<main>${content}</main><script>${portalScript}</script></body></html>`;
 }
 
 export const moduleNames = {
@@ -71,12 +125,26 @@ const groups = [
 ];
 
 const glyphs = {
+  search:'<circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/>',
+  home:'<path d="m3 10 9-7 9 7v10H3z M9 20v-7h6v7"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
+  tree:'<path d="M12 3v6 M6 9h12 M6 9v5 M18 9v5 M3 14h6v6H3z M15 14h6v6h-6z M9 3h6v6H9z"/>',
+  family:'<circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2 21v-3a6 6 0 0 1 12 0v3 M14 15a5 5 0 0 1 8 4v2"/>',
+  requests:'<path d="M6 3h9l4 4v14H6z M15 3v5h5 M9 12h7 M9 16h5"/>',
+  notifications:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 9h18c0-1-3-2-3-9 M10 21h4"/>',
+  membership:'<rect x="2" y="5" width="20" height="14" rx="3"/><circle cx="8" cy="12" r="2"/><path d="M13 10h6 M13 14h6"/>',
+  documents:'<path d="M7 2h7l5 5v15H7z M14 2v6h6 M10 13h6 M10 17h6"/>',
+  roles:'<path d="m12 2 9 4v6c0 6-4 9-9 10-5-1-9-4-9-10V6z M9 12l2 2 4-4"/>',
+  audit:'<circle cx="11" cy="11" r="8"/><path d="m17 17 5 5 M8 11l2 2 4-4"/>',
+  backups:'<path d="M4 4v6h6 M4 10a8 8 0 1 1 2 8 M12 7v5l4 2"/>',
+  permissions:'<path d="M8 12h12 M8 16h9 M8 8h12 M4 8h.1 M4 12h.1 M4 16h.1"/>',
+
   members: '<circle cx="12" cy="8" r="3"/><path d="M5 20v-2a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v2"/>',
   review: '<path d="M5 4h14v16H5z M8 12l3 3 5-6"/>',
   system: '<path d="M12 3l8 4v6c0 4-4 7-8 9-4-2-8-5-8-9V7z M9 12l2 2 4-4"/>',
 };
 const badge = status => `<span class="status">${e(status)}</span>`;
-const icon = key => `<span class="tile-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24">${glyphs[key]}</svg></span>`;
+const icon = key => `<span class="tile-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none">${glyphs[key] || glyphs.system}</svg></span>`;
 
 export function memberHome(user, status) {
   return page('الرئيسية', `<section class="member-hero">
@@ -97,8 +165,8 @@ export function dashboard(user, modules, status) {
   const groupIcons = ['members', 'review', 'system'];
   const panels = groups.map(([label, keys], index) => {
     const allowed = keys.filter(key => modules.includes(key));
-    return allowed.length ? `<section><div class="section-heading"><h2>${label}</h2></div><div class="grid">${allowed.map(key =>
-      `<a class="tile card" href="/dashboard/${key}">${icon(groupIcons[index])}<strong>${moduleNames[key]}</strong><span>فتح القسم ←</span></a>`).join('')}</div></section>` : '';
+    return allowed.length ? `<section data-module-group><div class="section-heading"><h2>${label}</h2><small>${new Intl.NumberFormat("ar-SA").format(allowed.length)} خدمات</small></div><div class="grid">${allowed.map(key =>
+      `<a class="tile card" href="/dashboard/${key}">${icon(glyphs[key] ? key : groupIcons[index])}<strong>${moduleNames[key]}</strong><span>فتح القسم ←</span></a>`).join('')}</div></section>` : '';
   }).join('');
   return page('لوحة التحكم', `<section class="member-hero"><div><h1>لوحة التحكم</h1><p>مرحبًا، ${e(user.name)}</p></div>${badge(status)}
     <div class="actions"><a class="action-link" href="/profile">الملف الشخصي</a><a class="action-link secondary" href="/">رئيسية البوابة</a></div>
@@ -107,6 +175,7 @@ export function dashboard(user, modules, status) {
     <div class="card"><h2>حالة العضوية</h2><p class="value">${e(status)}</p></div>
     <div class="card"><h2>الأقسام المتاحة لك</h2><p class="value">${new Intl.NumberFormat('ar-SA').format(modules.length)}</p></div>
   </section>
+  ${panels ? `<div class="page-tools"><label class="search-field" aria-label="البحث في أقسام اللوحة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${glyphs.search}</svg><input id="section-search" type="search" placeholder="ابحث عن خدمة أو قسم..." autocomplete="off"></label><span class="section-caption">اختر الخدمة المطلوبة من الأقسام المتاحة</span></div><p id="search-empty" class="search-empty" role="status">لا توجد خدمات مطابقة للبحث.</p>` : ''}
   ${panels || '<section class="card"><h2>ربط العضوية</h2><p>تُتاح خدمات العضوية بعد ربط الحساب بسجل معتمد وتفعيله من الإدارة. ملفك الشخصي متاح الآن.</p></section>'}`, true);
 }
 
