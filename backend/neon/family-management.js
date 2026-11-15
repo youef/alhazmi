@@ -51,7 +51,7 @@ async function inviteData(user){
   pool.query("select p.id,p.full_name_ar name,p.family_unit_id family_id,f.fakhth_unit_id fakhth_id from public.people p join public.lineage_family_fakhth_links f on f.family_unit_id=p.family_unit_id where p.record_status='verified' order by p.full_name_ar limit 120"),
   pool.query('select id,invited_email,invited_name,role_key,fakhth_unit_id,family_unit_id,parent_person_id,created_at,accepted_at,expires_at,revoked_at from public.diwan_supervisor_invitations order by created_at desc limit 70'),
   pool.query('select id,email,name from neon_auth."user" where "emailVerified" is true order by "createdAt" desc limit 100'),
-  pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,q.proposed_notes,q.proposed_details,q.proposed_gender,q.proposed_birth_date,q.identifier_type,q.identifier_last4,q.created_person_id,q.anchor_person_id,q.lineage_verified_at,u.email,l.name_ar family_name,p.name_ar fakhth_name,coalesce(created.record_status,'') person_record_status from public.diwan_family_relation_requests q join neon_auth.\"user\" u on u.id=q.submitter_id join public.lineage_units l on l.id=q.family_unit_id join public.lineage_units p on p.id=q.fakhth_unit_id left join public.people created on created.id=q.created_person_id order by q.created_at desc limit 70"),
+  pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,q.proposed_notes,q.proposed_details,q.proposed_gender,q.proposed_birth_date,q.identifier_type,q.identifier_last4,q.created_person_id,q.anchor_person_id,q.linked_person_id,q.lineage_verified_at,u.email,l.name_ar family_name,p.name_ar fakhth_name,coalesce(created.record_status,'') person_record_status,prior.full_name_ar matched_person_name from public.diwan_family_relation_requests q join neon_auth.\"user\" u on u.id=q.submitter_id join public.lineage_units l on l.id=q.family_unit_id join public.lineage_units p on p.id=q.fakhth_unit_id left join public.people created on created.id=q.created_person_id left join public.people prior on prior.id=q.linked_person_id order by q.created_at desc limit 70"),
   pool.query("select a.id,a.user_id,a.scope_type,a.scope_unit_id,a.scope_person_id,a.expires_at,u.email,r.name_ar role_name from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id join neon_auth.\"user\" u on u.id=a.user_id where r.role_key=any($1::text[]) and a.revoked_at is null and a.approved_at is not null order by a.created_at desc limit 80",[roleKeys])
  ]);
  return {fakhths:fakhths.rows,families:families.rows,parents:parents.rows,invitations:invitations.rows,accounts:accounts.rows,queue:queue.rows,activeSupervisors:activeSupervisors.rows};
@@ -226,6 +226,11 @@ async function reviewFamilyPerson(db,user,form){
  let marriageId=null;
  if(next==='approved'){
   if(form.get('confirm_evidence')!=='yes')reject('You must verify the evidence independently before accepting the provisional entry');
+  if(p.linked_person_id){
+   const prior=await db.query("select full_name_ar,record_status from public.people where id=$1",[p.linked_person_id]);
+   if(!prior.rows.length || prior.rows[0].record_status!=='verified')reject('Existing person record must be verified before linkage');
+   if(form.get('confirm_existing')!=='yes')reject('Existing identity match requires separate explicit verification');
+  }
   if(!personId){
    const name=String(p.proposed_name_ar);
    const first=name.split(/\s+/)[0];
@@ -281,6 +286,8 @@ export async function familyAction(user,request,form,area){
   await db.query('commit');
  }catch(error){
   await db.query('rollback');
+  if(error?.code==='23505')throw new HttpError(409,'A matching active record already exists');
+  if(['23503','23514','22P02','22007','22008'].includes(error?.code))throw new HttpError(400,'The supplied fields or family relationships are invalid');
   throw error;
  }finally{db.release();}
  return area==='admin'?'/admin/supervisors?done=1':'/family/manage?done=1';
