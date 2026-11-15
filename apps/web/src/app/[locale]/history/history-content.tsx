@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
-  ArrowLeft, ArrowUpLeft, BookOpen, BookMarked, Castle, CheckCircle2,
-  ChevronDown, Compass, FileText, Flag, GitBranch, Globe2,
+  ArrowLeft, ArrowUpLeft, BookOpen, BookMarked, Castle,
+  ChevronDown, FileText, Flag, GitBranch, Globe2,
   Landmark, MapPinned, Quote, ScrollText, ShieldCheck, UsersRound,
 } from 'lucide-react';
 import type { Locale } from '@/lib/i18n';
