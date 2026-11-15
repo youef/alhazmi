@@ -24,6 +24,7 @@ beforeEach(() => {
     return Response.json({ user, session: { userId } });
   };
   pool.query = async sql => {
+    if (sql.includes('user_custom_role_assignments') || sql.includes('permission_overrides')) return { rows: [] };
     assert.match(sql, /neon_auth/);
     return { rows: [{ id: userId, person_id: null }] };
   };
@@ -71,12 +72,31 @@ test('unlinked users can edit their profile but cannot read membership modules',
   assert.equal(profile.status, 200);
   const body = await profile.text();
   assert.match(body, /&lt;script&gt;hidden/);
-  assert.doesNotMatch(body, /<script>/);
+  assert.doesNotMatch(body, /<script>hidden<\/script>/);
   const dashboard = await members.fetch(new Request(`${origin}/dashboard`, { headers }));
   assert.equal(dashboard.status, 200);
   assert.doesNotMatch(await dashboard.text(), /href="\/dashboard\/audit"/);
   const direct = await members.fetch(new Request(`${origin}/dashboard/audit`, { headers }));
   assert.equal(direct.status, 403);
+});
+
+test('unlinked system administrators can reach audit but not personal genealogy', async () => {
+  pool.query = async (sql, args) => {
+    if (sql.includes('neon_auth')) return { rows: [{ id: userId, person_id: null }] };
+    if (sql.includes('user_custom_role_assignments')) return { rows: [{ decision: 'allow', scope_type: 'system' }] };
+    if (sql.includes('permission_overrides')) return { rows: [] };
+    if (sql.includes('permission_audit_events')) return { rows: [{ event_type: 'admin_access', outcome: 'success' }] };
+    throw new Error('Unexpected SQL: ' + sql);
+  };
+  const request = path => new Request(origin + path, { headers });
+  const dashboard = await members.fetch(request('/dashboard'));
+  assert.equal(dashboard.status, 200);
+  const body = await dashboard.text();
+  assert.match(body, /href="\/dashboard\/audit"/);
+  assert.doesNotMatch(body, /href="\/dashboard\/profile"/);
+  const audit = await members.fetch(request('/dashboard/audit'));
+  assert.equal(audit.status, 200);
+  assert.match(await audit.text(), /admin_access/);
 });
 
 test('system modules require a system scope and recheck permissions on page access', async () => {
