@@ -8,3 +8,15 @@ This source is a **security-first initial implementation**, not an unrestricted 
 - `neon.ts` declares existing Neon Auth and the private uploads bucket alongside both functions.
 - This is not yet a production authorization engine: inheritance, workflow, complex delegated scopes and consent have additional requirements. Unimplemented writes to those modules intentionally return 404 rather than bypassing approvals.
 - Don't place DB password or S3 credentials in repository.
+
+
+## Live deployment verification — 15 November 2026
+Both functions deployed on Neon `long-truth-63663365` / `br-flat-boat-azy2ouq3` (main), Node.js 24. Initial release encountered a bundle `require('events')` compatibility error and was corrected by adding a Node `createRequire` banner to the esbuild ESM bundle. Final deployment v2 for both functions was confirmed as completed by Neon.
+
+**Live checks (all confirmed, no credentials disclosed):**
+- `GET https://br-flat-boat-azy2ouq3-diwanapi.compute.c-3.ap-southeast-1.aws.neon.tech/health` -> `200` / `{"ok":true,"service":"alhazmi-api","version":1,"auth":"required-on-data"}`.
+- `GET https://br-flat-boat-azy2ouq3-diwanfiles.compute.c-3.ap-southeast-1.aws.neon.tech/health` -> `200` / `{"ok":true,"service":"alhazmi-uploads","bucket":"private","maxBytes":10485760}`.
+- Unauthenticated `GET /v1/me` -> `401` / `Authentication required`.
+- Unauthenticated `GET /v1/files` -> `401` / `Authentication required`.
+
+**Not yet established by live end-to-end test:** genuine JWT sign-in & linked family identity; role-specific reads; upload a test PDF/image to Object Storage with a real logged-in user; valid owner download; reviewer approval; multi-role inheritance; each administrative mutation's transaction and audit. Database structures already exist but the production workflow and UI still need completion. Do not label all 119 tables as fully writable or every role and action production-ready.
