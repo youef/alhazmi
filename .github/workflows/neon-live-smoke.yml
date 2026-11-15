@@ -1,0 +1,33 @@
+name: Neon Live API Smoke Test
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-live-smoke.yml'
+      - 'backend/neon/api.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  neon-public:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify public approved-only endpoint and allowed CORS
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://br-flat-boat-azy2ouq3-diwanapi.compute.c-3.ap-southeast-1.aws.neon.tech"
+          status=$(curl --retry 3 --retry-delay 3 --max-time 25 -sS -D /tmp/hdr -o /tmp/body -w '%{http_code}' -H 'Origin: https://youef.github.io' "$base/v1/public/lineage?limit=5&offset=0")
+          test "$status" = 200
+          grep -iq '^access-control-allow-origin: https://youef.github.io' /tmp/hdr
+          jq -e '.data|type=="array"' /tmp/body >/dev/null
+          jq -e '.meta.reviewStatus=="approved"' /tmp/body >/dev/null
+          echo "Public endpoint reachable, approved-only response shape verified."
+      - name: Verify private endpoints require authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://br-flat-boat-azy2ouq3-diwanapi.compute.c-3.ap-southeast-1.aws.neon.tech"
+          status=$(curl --retry 3 --retry-delay 3 --max-time 25 -sS -o /dev/null -w '%{http_code}' "$base/v1/me")
+          test "$status" = 401
+          echo "Private endpoint denies unauthenticated access."
