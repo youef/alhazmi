@@ -50,3 +50,5 @@ jobs:
             git commit -m "build: stage Neon function bundles for deployment"
             git push origin HEAD:main
           fi
+
+# Build must include the member portal bundle for direct Neon deployment.
