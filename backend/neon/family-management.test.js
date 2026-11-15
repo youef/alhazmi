@@ -34,8 +34,8 @@ beforeEach(()=>{
   query:async(sql,args)=>{
    connected.push({sql,args});
    if(sql.includes('person_identifiers'))return {rows:[]};
-   if(sql.includes('diwan_family_relation_requests')&&sql.includes('identifier_digest'))return {rows:[]};
    if(sql.includes('insert into public.diwan_family_relation_requests'))return {rows:[{id:requestId}]};
+   if(sql.includes('diwan_family_relation_requests')&&sql.includes('identifier_digest'))return {rows:[]};
    if(sql.includes('select * from public.diwan_supervisor_invitations'))return {rows:[]};
    return {rows:[]};
   },
