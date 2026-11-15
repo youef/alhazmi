@@ -17,13 +17,14 @@ export function LiveLineageDirectory({ locale, view }: { locale: Locale; view: '
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true); setError(false); setItems([]); setNextOffset(null);
     getPublicLineage(0, controller.signal)
       .then(page => { if (!controller.signal.aborted) { setItems(page.data); setNextOffset(page.meta.nextOffset); } })
       .catch(() => { if (!controller.signal.aborted) setError(true); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [nonce]);
+
+  function refresh() { setLoading(true); setError(false); setItems([]); setNextOffset(null); setNonce(value => value + 1); }
 
   async function more() {
     if (nextOffset === null || loadingMore) return;
@@ -47,7 +48,7 @@ export function LiveLineageDirectory({ locale, view }: { locale: Locale; view: '
     </div>
     <div className="directory-toolbar">
       <div className="directory-search"><Search size={18} aria-hidden="true"/><input aria-label={ar ? 'البحث بالأفخاذ والعوائل' : 'Search branches and families'} value={search} onChange={event=>setSearch(event.target.value)} placeholder={ar ? 'ابحث عن فخذ أو عائلة معتمدة...' : 'Search approved branches and families...'} /></div>
-      <button className="directory-retry" type="button" onClick={()=>setNonce(value=>value+1)}><RefreshCw size={17}/>{ar ? 'تحديث' : 'Refresh'}</button>
+      <button className="directory-retry" type="button" onClick={refresh}><RefreshCw size={17}/>{ar ? 'تحديث' : 'Refresh'}</button>
     </div>
     {loading ? <p role="status" className="directory-state">{ar ? 'جارٍ تحميل البيانات المعتمدة من Neon...' : 'Loading approved Neon records...'}</p>
       : error ? <p role="alert" className="directory-state">{ar ? 'تعذر الوصول إلى خدمة البيانات. قد يكون تحديث Neon Functions لم يُنشر بعد؛ لا نعرض بيانات تجريبية بدلًا عنها.' : 'The data service is unavailable or not yet deployed. No fake records are shown.'}</p>
