@@ -33,14 +33,14 @@ export const digest=buffer=>createHash('sha256').update(buffer).digest('hex');
 export async function authorized(u,key,target={}){
  // No client-controlled role labels or user_metadata. Every grant must be active and approved.
  const grants=await pool.query(
-  \`select crp.decision,a.scope_type,a.scope_person_id,a.scope_unit_id,a.scope_tribe_id
+  `select crp.decision,a.scope_type,a.scope_person_id,a.scope_unit_id,a.scope_tribe_id
      from public.user_custom_role_assignments a
      join public.custom_roles r on r.id=a.role_id and r.role_state='active'
      join public.custom_role_permissions crp on crp.role_id=r.id
      join public.permission_catalog p on p.id=crp.permission_id
     where a.user_id=$1 and p.permission_key=$2 and p.is_active
       and a.approved_at is not null and a.revoked_at is null
-      and a.starts_at<=now() and (a.expires_at is null or a.expires_at>now())\`,[u.id,key]);
+      and a.starts_at<=now() and (a.expires_at is null or a.expires_at>now())`,[u.id,key]);
  const match=async row=>{
    if(row.scope_type==='system')return true;
    if(row.scope_type==='self')return u.person_id&&target.personId===u.person_id&&row.scope_person_id===u.person_id;
@@ -58,11 +58,11 @@ export async function authorized(u,key,target={}){
  }
  // Explicit per-user deny also takes precedence; allow overrides cannot expand base permission.
  const denials=await pool.query(
-  \`select o.scope_type,o.target_person_id,o.target_unit_id,o.target_tribe_id
+  `select o.scope_type,o.target_person_id,o.target_unit_id,o.target_tribe_id
    from public.permission_overrides o join public.permission_catalog p on p.id=o.permission_id
    where o.subject_user_id=$1 and p.permission_key=$2 and o.effect='deny'
    and o.revoked_at is null and o.approved_at is not null
-   and o.starts_at<=now() and o.expires_at>now()\`,[u.id,key]);
+   and o.starts_at<=now() and o.expires_at>now()`,[u.id,key]);
  for(const d of denials.rows){
    if((d.target_person_id&&d.target_person_id===target.personId)||
       (d.target_unit_id&&d.target_unit_id===target.unitId)||
