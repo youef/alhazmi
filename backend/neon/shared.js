@@ -22,7 +22,7 @@ export async function userFrom(req){
  catch{throw new HttpError(401,'Invalid or expired session');}
  if(!isId(payload.sub))throw new HttpError(401,'Invalid subject');
  const result=await pool.query(
-   'select u.id,p.person_id,p.account_status,pe.tribe_id,pe.family_unit_id from neon_auth."user" u left join public.user_profiles p on p.user_id=u.id left join public.people pe on pe.id=p.person_id where u.id=$1 and u.banned is distinct from true limit 1',
+   'select u.id,p.person_id,p.account_status,pe.tribe_id,pe.family_unit_id,pe.record_status from neon_auth."user" u left join public.user_profiles p on p.user_id=u.id left join public.people pe on pe.id=p.person_id where u.id=$1 and u.banned is distinct from true and u."emailVerified" is true limit 1',
    [payload.sub]);
  if(!result.rows.length)throw new HttpError(401,'Account not found');
  const u=result.rows[0];
@@ -71,6 +71,6 @@ export async function authorized(u,key,target={}){
  return allowed;
 }
 export async function requireOwn(u){
- if(!u.person_id||!u.tribe_id)throw new HttpError(403,'Verified person profile required');
+ if(!u.person_id||!u.tribe_id||u.account_status!=='active'||u.record_status!=='verified')throw new HttpError(403,'Verified person profile required');
  return {personId:u.person_id,tribeId:u.tribe_id,unitId:u.family_unit_id};
 }

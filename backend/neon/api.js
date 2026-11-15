@@ -3,7 +3,7 @@ const MAX_ROWS=40;
 const MODULES={
  profile:{permission:null,query:'select id,full_name_ar,given_name_ar,record_status,visibility,family_unit_id from public.people where id=$1',mode:'person'},
  tree:{permission:'lineage.read',query:'select id,parent_id,unit_type,name_ar from public.lineage_units where tribe_id=$1 order by name_ar limit 500',mode:'tribe'},
- family:{permission:'family.read',query:"select id,full_name_ar,record_status from public.people where family_unit_id=$1 and record_status in ('verified','under_review') order by full_name_ar limit 40",mode:'unit'},
+ family:{permission:'family.read',query:"select id,full_name_ar,record_status from public.people where family_unit_id=$1 and record_status='verified' order by full_name_ar limit 40",mode:'unit'},
  requests:{permission:null,query:'select id,request_type,status,created_at,reviewed_at from public.change_requests where submitter_id=$1 order by created_at desc limit 40',mode:'user'},
  serviceRequests:{permission:null,query:'select id,service_id,state,created_at from public.member_service_requests where user_id=$1 order by created_at desc limit 40',mode:'user'},
  services:{permission:null,query:"select id,service_key,title_ar,description_ar from public.service_definitions where status='active' and visibility='authenticated' limit 40",mode:'none'},
@@ -38,28 +38,37 @@ function publicCors(req) {
 }
 async function publicLineage(req) {
  const url=new URL(req.url);
+ const search=(url.searchParams.get('q')||'').trim();
+ if(search.length>100)throw new HttpError(400,'Search is too long');
  const requested=Number(url.searchParams.get('limit')||50);
  const offset=Number(url.searchParams.get('offset')||0);
  if(!Number.isInteger(requested)||requested<1||requested>100||!Number.isSafeInteger(offset)||offset<0||offset>100000)throw new HttpError(400,'Invalid pagination');
  const r=await pool.query(
-  `select l.id,l.parent_id,l.unit_type,l.name_ar,l.name_en
-    from public.lineage_units l
-    where exists (
-      select 1 from public.lineage_seed_reviews review
-      where review.unit_id=l.id and review.review_status='approved'
-      and review.verified_at is not null
+  `with published as (
+      select l.id,l.parent_id,l.tribe_id,l.unit_type,l.name_ar,l.name_en
+      from public.lineage_units l
+      join public.lineage_seed_reviews review on review.unit_id=l.id
+      where review.review_status='approved'
+        and review.verified_at is not null and review.verified_by is not null
     )
+    select l.id,p.id as parent_id,l.unit_type,l.name_ar,l.name_en
+    from published l
+    left join published p on p.id=l.parent_id and p.tribe_id=l.tribe_id
+    where $3='' or strpos(lower(l.name_ar),lower($3))>0
+      or strpos(lower(coalesce(l.name_en,'')),lower($3))>0
     order by l.name_ar,l.id limit $1 offset $2`,
-  [requested,offset]
+  [requested+1,offset,search]
  );
- return Response.json({data:r.rows,meta:{limit:requested,offset,nextOffset:r.rows.length===requested?offset+requested:null,reviewStatus:'approved'}},
+ const data=r.rows.slice(0,requested);
+ return Response.json({data,meta:{limit:requested,offset,nextOffset:r.rows.length>requested?offset+requested:null,reviewStatus:'approved'}},
  {headers:{...publicCors(req),'Cache-Control':'public,max-age=60','X-Content-Type-Options':'nosniff'}});
 }
 
 async function readModule(name,u){
- const def=MODULES[name];if(!def)throw new HttpError(404,'Unknown module');
+ const def=Object.hasOwn(MODULES,name)?MODULES[name]:null;if(!def)throw new HttpError(404,'Unknown module');
  const own=await requireOwn(u); // no listing of family info for unlinked accounts
  if(def.permission&&!await authorized(u,def.permission,own))throw new HttpError(403,'Permission denied');
+ if ((name==='audit'||name==='backups'||name==='forms') && !await authorized(u,def.permission))throw new HttpError(403,'System scope required');
  const param=def.mode==='user'?u.id:def.mode==='person'?own.personId:def.mode==='unit'?own.unitId:def.mode==='tribe'?own.tribeId:undefined;
  if(def.mode==='unit'&&!param)throw new HttpError(403,'Family scope required');
  const result=await pool.query(def.query,param===undefined?[]:[param]);
