@@ -5,7 +5,7 @@ export default async function BranchesPage({ params }: { params: Promise<{ local
  const { locale } = await params;
  if (!isLocale(locale)) notFound();
  const t = getDictionary(locale);
- return <main className="container inner-page">
+ return <main id="main-content" className="container inner-page">
    <h1>{t.branchesTitle}</h1><p className="inner-lead">{t.branchesDesc}</p>
    <LiveLineageDirectory locale={locale} view="branches" />
  </main>;
