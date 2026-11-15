@@ -154,7 +154,7 @@ export function familyMemberView(data,csrf,done){
  const shareForm=data.ownVerified?form('/family/manage','share_name',csrf,
    '<label>بريد شخص تسمح له برؤية اسمك في الشجرة<input name="viewer_email" type="email" maxlength="254" placeholder="relative@example.com" required></label>'
    +'<p class="family-sub">لا تشمل الموافقة رقم الهوية أو المعلومات الخاصة؛ الاسم المعتمد فقط.</p>','إضافة موافقة اطلاع'):'<p class="family-sub">تُتاح مشاركة الاسم بعد توثيق سجل شخصك وربطه بحسابك.</p>';
- const sharedNames=table(['المسموح له','إلغاء'],data.consents.map(c=>row([e(c.email),
+ const sharedNames=table(['المسموح له','إلغاء'],(data.consents||[]).map(c=>row([e(c.email),
    form('/family/manage','revoke_name',csrf,'<input type="hidden" name="viewer" value="'+e(c.allowed_user_id)+'">','إلغاء الموافقة')])));
   const body='<div class="family-shell"><div class="family-breadcrumb"><a href="/dashboard">لوحة التحكم</a> / إدارة أسرتي</div>'
  +'<section class="family-banner"><h1>إدارة الأسرة والقرابة</h1><p>تظهر ذرية الأب والأم وأبناء الأبناء والبنات، مع بقاء الأبناء والبنات المتزوجين في تسلسل النسب المعتمد. البيانات الخاصة محمية بموافقات الاطلاع.</p></section>'
