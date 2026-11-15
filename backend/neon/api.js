@@ -76,24 +76,46 @@ async function canReadModule(name, user, own) {
  return authorized(user, definition.permission, target);
 }
 
-export async function accessibleModules(user) {
+// System-scoped administrators do not need a linked genealogy record to administer the portal.
+// Person- and family-scoped data still require a verified relationship.
+async function moduleContext(user) {
+ const admin = await authorized(user, 'roles.view');
  let own;
  try { own = await requireOwn(user); }
  catch (error) {
-  if (error instanceof HttpError && error.status === 403) return [];
-  throw error;
+  if (!(error instanceof HttpError && error.status === 403)) throw error;
+  own = {personId:null, tribeId:null, unitId:null};
  }
- const names = Object.keys(MODULES);
- const allowed = await Promise.all(names.map(name => canReadModule(name, user, own)));
- return names.filter((name, index) => allowed[index]);
+ return { ...own, admin };
 }
-
+async function moduleAllowed(name,user,own) {
+ const def=MODULES[name];
+ if (!def) return false;
+ if (def.mode==='person' && !own.personId) return false;
+ if (def.mode==='unit' && !own.unitId) return false;
+ if (def.mode==='tribe' && !own.tribeId && !own.admin) return false;
+ if (!def.permission) return true;
+ if (own.admin) return authorized(user,def.permission);
+ return canReadModule(name,user,own);
+}
+export async function accessibleModules(user) {
+ const own=await moduleContext(user);
+ const names=Object.keys(MODULES);
+ const allowed=await Promise.all(names.map(name=>moduleAllowed(name,user,own)));
+ return names.filter((_,i)=>allowed[i]);
+}
 export async function readModule(name,u){
  const def=Object.hasOwn(MODULES,name)?MODULES[name]:null;
  if(!def)throw new HttpError(404,'Unknown module');
- const own=await requireOwn(u);
- if(!await canReadModule(name,u,own))throw new HttpError(403,'Permission denied');
- const param=def.mode==='user'?u.id:def.mode==='person'?own.personId:def.mode==='unit'?own.unitId:def.mode==='tribe'?own.tribeId:undefined;
+ const own=await moduleContext(u);
+ if(!await moduleAllowed(name,u,own))throw new HttpError(403,'Permission denied');
+ let tribeId=own.tribeId;
+ if(def.mode==='tribe'&&!tribeId&&own.admin){
+  const tribes=await pool.query('select id from public.tribes order by created_at,id limit 1');
+  tribeId=tribes.rows[0]?.id;
+  if(!tribeId)return {module:name,items:[]};
+ }
+ const param=def.mode==='user'?u.id:def.mode==='person'?own.personId:def.mode==='unit'?own.unitId:def.mode==='tribe'?tribeId:undefined;
  const result=await pool.query(def.query,param===undefined?[]:[param]);
  return {module:name,items:result.rows};
 }
