@@ -109,6 +109,21 @@ async function reviewClaim(db,u,f){
  if(!r.rows.length)throw new HttpError(409,'Claim has changed');
  await auditWrite(db,u,'admin_claim_reviewed',{id,previous:expected,next});
 }
+async function createService(db,u,f){
+ const key=clip(f.get('key'),90),title=clip(f.get('title'),120),description=clip(f.get('description'),600),visibility=clip(f.get('visibility'),30);
+ if(!/^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$/.test(key)||title.length<3||!['authenticated','authorized_family','admins'].includes(visibility))throw new HttpError(400,'Invalid service details');
+ const r=await db.query("insert into public.service_definitions(service_key,title_ar,description_ar,visibility,status) values($1,$2,$3,$4,'draft') returning id",[key,title,description||null,visibility]);
+ await auditWrite(db,u,'admin_service_created',{id:r.rows[0].id,key});
+}
+async function reviewService(db,u,f){
+ const id=uid(f,'id'),expected=clip(f.get('expected'),30),next=clip(f.get('next'),30),note=clip(f.get('note'),500);
+ const pending=['submitted','in_review','needs_evidence'];
+ const allowed=pending.includes(expected) ? ['in_review','needs_evidence','approved','rejected'] : expected==='approved'?['completed']:[];
+ if(!allowed.includes(next)||note.length<10)throw new HttpError(400,'Invalid decision or review note');
+ const r=await db.query("update public.member_service_requests set state=$1,finished_at=case when $1 in ('rejected','completed') then now() else null end where id=$2 and state=$3 returning id",[next,id,expected]);
+ if(!r.rows.length)throw new HttpError(409,'Service request was already updated');
+ await auditWrite(db,u,'admin_service_request_reviewed',{id,previous:expected,next,note});
+}
 async function changeService(db,u,f){
  const id=uid(f,'id'),expected=clip(f.get('expected'),30),next=clip(f.get('next'),30);
  if(!['draft','active'].includes(expected)||!['draft','active'].includes(next)||next===expected)throw new HttpError(400,'Unsupported service state');
@@ -140,6 +155,8 @@ async function createRole(db,u,f){
 }
 async function grantRole(db,u,f){
  const role=uid(f,'role'),target=uid(f,'target'),tribe=uid(f,'tribe');
+ const days=Number(f.get('duration_days')||90);
+ if(![30,90,365].includes(days))throw new HttpError(400,'Invalid assignment duration');
  const roles=await db.query("select id from public.custom_roles where id=$1 and not is_system and role_state='active' and max_scope='tribe' and tribe_id is null",[role]);
  const people=await db.query('select id from neon_auth."user" where id=$1 and "emailVerified" is true and banned is distinct from true',[target]);
  const scopes=await db.query('select id from public.tribes where id=$1',[tribe]);
@@ -147,8 +164,8 @@ async function grantRole(db,u,f){
  await db.query('select auth.link_verified_neon_user($1::uuid)',[target]);
  const exists=await db.query('select 1 from public.user_custom_role_assignments where user_id=$1 and role_id=$2 and scope_tribe_id=$3 and revoked_at is null and (expires_at is null or expires_at>now())',[target,role,tribe]);
  if(exists.rows.length)throw new HttpError(409,'Assignment exists');
- await db.query("insert into public.user_custom_role_assignments(user_id,role_id,scope_type,scope_tribe_id,assigned_by,approved_by,approved_at,reason) values($1,$2,'tribe',$3,$4,$4,now(),'Approved in Diwan administration')",[target,role,tribe,u.id]);
- await auditWrite(db,u,'admin_role_granted',{role,tribe},target);
+ await db.query("insert into public.user_custom_role_assignments(user_id,role_id,scope_type,scope_tribe_id,assigned_by,approved_by,approved_at,expires_at,reason) values($1,$2,'tribe',$3,$4,$4,now(),now()+make_interval(days=>$5),'Approved in Diwan administration')",[target,role,tribe,u.id,days]);
+ await auditWrite(db,u,'admin_role_granted',{role,tribe,durationDays:days},target);
 }
 async function revokeRole(db,u,f){
  const id=uid(f,'id');
@@ -161,6 +178,8 @@ const OPERATIONS={
  review_request:['requests','approval.review',reviewRequest],
  review_claim:['claims','identity.edit',reviewClaim],
  change_service:['services','approval.configure',changeService],
+ create_service:['services','approval.configure',createService],
+ review_service:['services','approval.review',reviewService],
  change_member:['members','roles.manage',changeMember],
  create_role:['roles','roles.manage',createRole],
  grant_role:['roles','roles.assign',grantRole],
