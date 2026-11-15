@@ -224,36 +224,30 @@ create index on public.audit_log(happened_at desc);
 -- Prevent cycles in the two canonical parent pointers. Execution in SECURITY INVOKER context.
 create function public.validate_person_parentage()
 returns trigger language plpgsql set search_path = public as $$
+declare p_id uuid;
 begin
- if new.father_id = new.id or new.mother_id = new.id then
-  raise exception 'A person cannot be their own parent';
+ if new.id = new.father_id or new.id = new.mother_id then
+   raise exception 'A person cannot be their own parent';
  end if;
- if new.father_id is not null and exists (
-   with recursive ancestors(id,path) as (
-     select new.father_id, array[new.father_id]
-     union all
-     select p.father_id, a.path || p.father_id from ancestors a
-       join public.people p on p.id=a.id
-       where p.father_id is not null and not p.father_id=any(a.path)
-     union all
-     select p.mother_id, a.path || p.mother_id from ancestors a
-       join public.people p on p.id=a.id
-       where p.mother_id is not null and not p.mother_id=any(a.path)
-   ) select 1 from ancestors where id=new.id
- ) then raise exception 'Parentage cycle detected'; end if;
- if new.mother_id is not null and exists (
-   with recursive ancestors(id,path) as (
-     select new.mother_id, array[new.mother_id]
-     union all
-     select p.father_id, a.path || p.father_id from ancestors a
-       join public.people p on p.id=a.id
-       where p.father_id is not null and not p.father_id=any(a.path)
-     union all
-     select p.mother_id, a.path || p.mother_id from ancestors a
-       join public.people p on p.id=a.id
-       where p.mother_id is not null and not p.mother_id=any(a.path)
-   ) select 1 from ancestors where id=new.id
- ) then raise exception 'Parentage cycle detected'; end if;
+ if new.father_id is not null and new.father_id = new.mother_id then
+   raise exception 'Father and mother records must be distinct';
+ end if;
+ foreach p_id in array array[new.father_id,new.mother_id] loop
+  if p_id is not null and exists (
+    with recursive ancestors(id,path) as (
+      select p_id, array[p_id]
+      union all
+      select next_parent.parent_id, a.path || next_parent.parent_id
+      from ancestors a
+      join public.people p on p.id=a.id
+      cross join lateral (values (p.father_id),(p.mother_id)) as next_parent(parent_id)
+      where next_parent.parent_id is not null
+        and not next_parent.parent_id=any(a.path)
+    ) select 1 from ancestors where id=new.id
+  ) then
+    raise exception 'Parentage cycle detected';
+  end if;
+ end loop;
  return new;
 end; $$;
 create trigger validate_people_parentage before insert or update of father_id,mother_id on public.people
