@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { accountFromId, authorized, HttpError, route } from './shared.js';
 import { accessibleModules, readModule } from './api.js';
 import { ADMIN_SECTIONS, adminAction, adminData, csrfFor } from './admin.js';
+import { familyAction, familyAdminData, familySupervisorData } from './family-management.js';
+import { familyAdminView, familyMemberView } from './family-views.js';
 import { adminView } from './admin-views.js';
 import { memberAuth } from './member-auth.js';
 import { authPage, dashboard, memberHome, moduleNames, modulePage, page, profilePage, portalScript } from './member-views.js';
@@ -165,6 +167,18 @@ export default {
       if (!user) return redirect(headers, '/login');
       const account = await accountFromId(user.id);
       const status = membershipStatus(account);
+      if (path === '/admin/supervisors') {
+        if (request.method === 'POST')
+          return redirect(headers, await familyAction(account, request, await readForm(request), 'admin'));
+        const data = await familyAdminData(account);
+        return html(familyAdminView(data, csrfFor(account,request), url.searchParams.get('done') === '1'));
+      }
+      if (path === '/family/manage') {
+        if (request.method === 'POST')
+          return redirect(headers, await familyAction(account, request, await readForm(request), 'family'));
+        const data = await familySupervisorData(account);
+        return html(familyMemberView(data, csrfFor(account,request), url.searchParams.get('done') === '1'));
+      }
       if (path === '/admin' || path.startsWith('/admin/')) {
         const section = path === '/admin' ? 'overview' : path.slice('/admin/'.length);
         if (!ADMIN_SECTIONS.includes(section)) return html(page('الصفحة غير موجودة', '<p>القسم الإداري غير موجود.</p>', true), 404);
