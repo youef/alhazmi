@@ -42,6 +42,7 @@ nav a,nav form button{min-height:44px;display:inline-flex;align-items:center}
 :where(a,button,input):focus-visible{outline:3px solid #c29643;outline-offset:3px}
 
 /* Diwan design system: government-service inspired, independent identity */
+[hidden]{display:none!important}
 :root{--canvas:#f3f6f5;--surface:#fff;--text:#16372b;--muted:#62746b;--line:#dce8e1;--accent:#006b45;--soft:#e8f5ee;--header:#06452f;--gold:#c8a35d}
 body{font-family:Tahoma,"Segoe UI",system-ui,sans-serif;line-height:1.8}
 header{background:#fff;color:#183a2c;border-bottom:1px solid var(--line);box-shadow:0 2px 14px #0b382b09;position:sticky;top:0;z-index:10}
