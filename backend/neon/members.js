@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { accountFromId, HttpError, route } from './shared.js';
+import { accountFromId, authorized, HttpError, route } from './shared.js';
 import { accessibleModules, readModule } from './api.js';
 import { memberAuth } from './member-auth.js';
 import { authPage, dashboard, memberHome, moduleNames, modulePage, page, profilePage, portalScript } from './member-views.js';
@@ -164,7 +164,8 @@ export default {
       const account = await accountFromId(user.id);
       const status = membershipStatus(account);
       if (path === '/dashboard' && request.method === 'GET') {
-        return html(dashboard(user, await accessibleModules(account), status));
+        const [modules, isAdmin] = await Promise.all([accessibleModules(account), authorized(account, 'roles.view')]);
+        return html(dashboard(user, modules, status, isAdmin));
       }
       if (path === '/profile' && request.method === 'GET') return html(profilePage(user, status));
       if (path === '/profile' && request.method === 'POST') {
