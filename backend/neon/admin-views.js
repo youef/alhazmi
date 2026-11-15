@@ -25,7 +25,7 @@ const css=`
 .adm-nav a[aria-current=page],.adm-nav a:hover{background:#e8f5ed!important;color:#075d3b!important;font-weight:850}
 .adm-main{min-width:0}
 .adm-hero{border-radius:23px;color:#fff;background:linear-gradient(115deg,#05432e,#08794d);padding:clamp(22px,4vw,36px);position:relative;overflow:hidden;box-shadow:0 16px 32px #03493222}
-.adm-hero:after{content:"";position:absolute;border-radius:50%;border:1px solid #ffffff33;width:260px;height:260px;inset-inline-end:-50px;top:-100px;box-shadow:0 0 0 42px #ffffff08,0 0 0 88px #ffffff09;pointer-events:none}
+.adm-hero:before{display:none!important}\n.adm-hero:after{content:"";position:absolute;border-radius:50%;border:1px solid #ffffff33;width:260px;height:260px;inset-inline-end:-50px;top:-100px;box-shadow:0 0 0 42px #ffffff08,0 0 0 88px #ffffff09;pointer-events:none}
 .adm-eyebrow{font-size:.77rem;font-weight:800;color:#d8efdf;letter-spacing:.06em}
 .adm-hero h1{margin:4px 0;font-size:clamp(1.5rem,3vw,2.1rem)}
 .adm-hero p{max-width:680px;font-size:.9rem;color:#e2f4e9}
