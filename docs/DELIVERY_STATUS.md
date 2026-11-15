@@ -1,6 +1,9 @@
-# حالة التسليم
+# Delivery state
 
-- ✅ قاعدة V1 وتوسعة V2 للأسماء المفصلة والهوية والسجلات الأسرية والانتقالات والمراجعات مرفوعة إلى GitHub.
-- ✅ RLS مغلق افتراضيًا لجميع الجداول الجديدة.
-- ⏳ لم يتم تنفيذ SQL على Supabase، أو اختبار قاعدة حية، أو نشر واجهة.
-- ⏳ خوارزمية القرابة وواجهات الصلاحيات ومراجعة الطلبات والتشفير التطبيقي ما زالت قيد التخطيط.
+- ✅ V1 core genealogy database and initial security defaults.
+- ✅ V2 identity fingerprint/parts of name, historical residence, genealogist workflows, audit and conflict tables.
+- ✅ V3 household histories, membership cards, stable registry IDs, consent, grants, historical transfers, name variants, death workflows, scoped kinship cache.
+- ✅ All new V3 tables have RLS enabled and browser roles revoked by default.
+- ⏳ Not deployed or executed on a real Supabase project; migration needs staging integration tests.
+- ⏳ Website UI, digital QR endpoint, consent enforcement, household approval, full kinship calculation and role policies not yet implemented.
+- ⏳ Do not use real identities/private data until encryption, RLS authorization and retention/compliance review are complete.
