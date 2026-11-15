@@ -16,7 +16,7 @@
     "functions:check": "node --check backend/neon/api.js && node --check backend/neon/uploads.js && node --check backend/neon/shared.js && node --check backend/neon/members.js && node --check backend/neon/member-auth.js && node --check backend/neon/member-views.js",
     "check": "npm run functions:check && npm run functions:test",
     "build:functions": "node ./backend/neon/build.mjs",
-    "functions:test": "node --test backend/neon/members.test.js"
+    "functions:test": "node --test backend/neon/*.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.900.0",
