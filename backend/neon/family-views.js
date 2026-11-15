@@ -89,10 +89,29 @@ export function familyAdminView(data,csrf,done){
    +'<label>ملاحظات وإثباتات المراجعة<textarea name="note" required minlength="10" maxlength="700"></textarea></label>'
    +'<label class="family-checkbox"><input type="checkbox" name="confirm_evidence" value="yes"> أؤكد مراجعة الإثباتات قبل الموافقة الأولية</label>',
    'تسجيل القرار')+'</details>':'<span class="family-slim">تم البت</span>';
+  let followUp='';
+  if(q.status==='approved'&&q.created_person_id&&q.person_record_status==='under_review'){
+   followUp=form('/admin/supervisors','verify_person',csrf,
+    '<input type="hidden" name="request" value="'+e(q.id)+'">'
+    +'<label>مبرر التوثيق<textarea name="note" required minlength="15" maxlength="700"></textarea></label>'
+    +'<label class="family-checkbox"><input type="checkbox" name="confirm_evidence" value="yes" required> تحققت من الأدلة وهوية الشخص</label>',
+    'توثيق سجل الشخص');
+  }else if(q.status==='approved'&&q.created_person_id&&q.person_record_status==='verified'&&q.anchor_person_id&&!q.lineage_verified_at&&['son','daughter','father','mother','spouse'].includes(q.relationship)){
+   followUp=form('/admin/supervisors','verify_connection',csrf,
+    '<input type="hidden" name="request" value="'+e(q.id)+'">'
+    +'<label>مبرر توثيق القرابة<textarea name="note" required minlength="15" maxlength="700"></textarea></label>'
+    +'<label class="family-checkbox"><input type="checkbox" name="confirm_evidence" value="yes" required> تحققت من صلة القرابة ومستنداتها</label>',
+    'اعتماد العلاقة النهائية');
+  }
   return row([e(q.proposed_name_ar),e(relationshipLabels[q.relationship]||q.relationship),
-   e(q.family_name)+' / '+e(q.fakhth_name),e(q.email),pills(q.status),next]);
+   e(q.family_name)+' / '+e(q.fakhth_name),e(q.email),pills(q.status),next+followUp]);
  });
- const content='<div class="family-shell">'
+ const linkFields=select('المستخدم صاحب البريد المؤكد','account',data.accounts,'id',a=>a.email,true)
+  +select('السجل الموثّق المطلوب ربطه','person',data.parents,'id',p=>p.name,true)
+  +'<label>مبرر التحقق من الهوية<textarea name="note" minlength="15" maxlength="700" required></textarea></label>'
+  +'<label class="family-checkbox"><input type="checkbox" name="confirm_evidence" value="yes" required> طابقت المستندات مع صاحب الحساب</label>';
+ const linkCard=data.parents.length?form('/admin/supervisors','link_account',csrf,linkFields,'ربط الحساب بالشخص'):'<div class="family-empty">لا توجد سجلات أشخاص موثّقة بعد. أضف سجلاً أوليًا ثم اعتمده على مرحلتين.</div>';
+  const content='<div class="family-shell">'
  +'<div class="family-breadcrumb"><a href="/admin">الإدارة</a> / إدارة المشرفين والأنساب</div>'
  +'<div class="family-banner"><h1>مركز الإشراف على الأفخاذ والعوائل</h1><p>توزيع الأدوار وربط كل مشرف بالفخذ أو العائلة أو الشخص الموثّق، وإدارة طلبات إضافة أفراد الأسرة ومراجعة القرابة.</p></div>'
  +(done?'<div class="family-callout" role="status">تم تنفيذ الإجراء وحفظه بنجاح.</div>':'')
@@ -101,6 +120,7 @@ export function familyAdminView(data,csrf,done){
  +'<section class="family-card"><h2>حسابات المستخدمين المسجلة</h2>'+table(['المستخدم','البريد'],data.accounts.map(u=>row([e(u.name||'مستخدم'),'<span dir="ltr">'+e(u.email)+'</span>'])))+'</section></div>'
  +'<section class="family-card"><h2>سجل دعوات الإشراف</h2>'+table(['الحساب','الدور','الفخذ','الحالة','أنشئت','إلغاء'],pendingInvites)+'</section>'
  +'<section class="family-card"><h2>المشرفون الفعّالون وسحب صلاحياتهم</h2>'+table(['المستخدم','الدور','النطاق','ينتهي','الإجراء'],supervisors)+'</section>'
+ +'<section class="family-card"><h2>ربط حساب مستخدم بسجل نسب موثّق</h2><p class="family-callout family-warning">الربط يتطلب التحقق المستقل من هوية صاحب الحساب؛ مجرد تطابق الاسم أو البريد لا يكفي.</p>'+linkCard+'</section>'
  +'<section class="family-card"><h2>مراجعة إضافات الأسرة والقرابة</h2><p class="family-callout family-warning">رقم الهوية وحده لا يثبت النسب. القبول الأولي ينشئ سجلًا خاصًا قيد التحقق، وروابط الأبوة أو الزواج تبقى غير موثّقة حتى مراجعتها.</p>'+table(['الاسم','صلة القرابة','النطاق','مقدم الطلب','الحالة','الإجراء'],queue)+'</section>'
  +'<div class="family-actions"><a class="family-btn secondary" href="/admin">العودة للإدارة</a><a class="family-btn secondary" href="/family/manage">بوابة إدارة الأسرة</a></div></div>';
  return page('مشرفو الأفخاذ والعوائل', '<style>'+css+'</style>'+content,true);
@@ -131,13 +151,19 @@ export function familyMemberView(data,csrf,done){
  +'<p class="family-callout family-warning">بعد الإرسال يظهر الطلب لدى الإدارة تلقائيًا. وجود رقم الهوية لا يمنح حق الاطلاع على بيانات شخص آخر.</p>';
  const requests=table(['الاسم','العلاقة','العائلة','الحالة','التاريخ'],data.pending.map(r=>row([e(r.proposed_name_ar),e(relationshipLabels[r.relationship]||r.relationship),e(r.family_name),pills(r.status),e(date(r.created_at))])));
  const relatives='<div>'+data.relatives.map(x=>'<div class="family-relation-item"><span class="family-relation-glyph">✦</span><div><strong>'+e(x.display_name||'اسم محجوب لحماية الخصوصية')+'</strong><div class="family-slim">'+e(relationshipLabels[x.relation_kind]||x.relation_kind)+(x.generation>1?' — الجيل '+fmt(x.generation):'')+'</div></div></div>').join('')+'</div>';
- const body='<div class="family-shell"><div class="family-breadcrumb"><a href="/dashboard">لوحة التحكم</a> / إدارة أسرتي</div>'
+ const shareForm=data.ownVerified?form('/family/manage','share_name',csrf,
+   '<label>بريد شخص تسمح له برؤية اسمك في الشجرة<input name="viewer_email" type="email" maxlength="254" placeholder="relative@example.com" required></label>'
+   +'<p class="family-sub">لا تشمل الموافقة رقم الهوية أو المعلومات الخاصة؛ الاسم المعتمد فقط.</p>','إضافة موافقة اطلاع'):'<p class="family-sub">تُتاح مشاركة الاسم بعد توثيق سجل شخصك وربطه بحسابك.</p>';
+ const sharedNames=table(['المسموح له','إلغاء'],data.consents.map(c=>row([e(c.email),
+   form('/family/manage','revoke_name',csrf,'<input type="hidden" name="viewer" value="'+e(c.allowed_user_id)+'">','إلغاء الموافقة')])));
+  const body='<div class="family-shell"><div class="family-breadcrumb"><a href="/dashboard">لوحة التحكم</a> / إدارة أسرتي</div>'
  +'<section class="family-banner"><h1>إدارة الأسرة والقرابة</h1><p>تظهر ذرية الأب والأم وأبناء الأبناء والبنات، مع بقاء الأبناء والبنات المتزوجين في تسلسل النسب المعتمد. البيانات الخاصة محمية بموافقات الاطلاع.</p></section>'
  +(done?'<div class="family-callout" role="status">تم حفظ الطلب وإرساله إلى الإدارة للمراجعة.</div>':'')
  +'<div class="family-grid"><section class="family-card"><h2>صلاحيات الإشراف الحالية</h2><div class="family-roles">'+data.grants.map(g=>'<span class="family-pill">'+e(status[g.role_key]||g.role_key)+'</span>').join('')+'</div><h3>العائلات المتاحة</h3><div class="family-pillrow">'+(familyNames||'<span class="family-sub">لم يُربط حسابك بفخذ أو عائلة بعد.</span>')+'</div><p class="family-sub">الصلاحيات لا تنتقل إلى عائلات أخرى تلقائيًا.</p></section>'
  +'<section class="family-card"><h2>دعوات المشرفين</h2>'+(inviteCards||'<div class="family-empty">لا توجد دعوات بانتظار القبول.</div>')+'<p class="family-sub">يجب أن يكون بريدك مؤكدًا لقبول أي دعوة.</p></section></div>'
  +'<div class="family-grid"><section class="family-card"><h2>إضافة زوجة أو ابن أو ابنة أو قريب</h2>'+(data.families.length?form('/family/manage','submit',csrf,proposeFields,'إرسال الطلب للمراجعة'):'<div class="family-empty">يجب منح نطاق إشراف وربطه بسجل العائلة قبل الإضافة.</div>')+'</section>'
  +'<section class="family-card"><h2>التسلسل العائلي الموثق</h2><p class="family-sub">الجد والجدة، العم والخال، الذرية المباشرة والأحفاد. العلاقات مشتقة من السجلات المعتمدة فقط.</p>'+(data.relatives.length?relatives:'<div class="family-empty">لا توجد روابط نسب موثّقة متاحة بعد. طلباتك المرسلة تظهر أدناه.</div>')+'</section></div>'
+ +'<section class="family-card"><h2>موافقة مشاركة اسمي مع الأقارب</h2>'+shareForm+sharedNames+'</section>'
  +'<section class="family-card"><h2>طلباتي العائلية السابقة</h2>'+requests+'</section><div class="family-actions"><a href="/dashboard" class="family-btn secondary">لوحة التحكم</a></div></div>';
  return page('إدارة أسرتي', '<style>'+css+'</style>'+body,true);
 }
