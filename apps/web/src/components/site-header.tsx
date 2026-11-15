@@ -1,30 +1,74 @@
+'use client';
+
 import Link from 'next/link';
-import type { Locale } from '@/lib/i18n';
-import { getDictionary } from '@/lib/i18n';
+import { usePathname } from 'next/navigation';
+import { Archive, BookOpenText, GitBranch, Globe2, House, Moon, Sun, UsersRound } from 'lucide-react';
+import { useSyncExternalStore } from 'react';
+import { getDictionary, type Locale } from '@/lib/i18n';
+
+const themeEvent = 'diwan-theme';
+function subscribe(listener: () => void) {
+  const preference = window.matchMedia('(prefers-color-scheme: dark)');
+  preference.addEventListener('change', listener);
+  window.addEventListener(themeEvent, listener);
+  return () => {
+    preference.removeEventListener('change', listener);
+    window.removeEventListener(themeEvent, listener);
+  };
+}
+function themeSnapshot() {
+  const current = document.documentElement.dataset.theme;
+  return current ? current === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+const initialTheme = () => false;
 
 export function SiteHeader({ locale }: { locale: Locale }) {
+  const pathname = usePathname().replace(/\/$/, '');
+  const dark = useSyncExternalStore(subscribe, themeSnapshot, initialTheme);
   const t = getDictionary(locale);
+  const ar = locale === 'ar';
+  const nextLocale = ar ? 'en' : 'ar';
+  const suffix = pathname.replace(/^\/(ar|en)(?=\/|$)/, '');
   const entries = [
-    { path: '', label: t.nav.home },
-    { path: '/history', label: t.nav.history },
-    { path: '/branches', label: t.nav.branches },
-    { path: '/lineage', label: t.nav.lineage },
-    { path: '/archive', label: t.nav.archive },
+    { path: '', label: t.nav.home, Icon: House },
+    { path: '/branches', label: t.nav.branches, Icon: UsersRound },
+    { path: '/lineage', label: t.nav.lineage, Icon: GitBranch },
+    { path: '/history', label: t.nav.history, Icon: BookOpenText },
+    { path: '/archive', label: t.nav.archive, Icon: Archive },
   ];
-  return (
-    <header className="site-header">
-      <div className="container header-inner">
-        <Link className="brand" href={`/${locale}`} aria-label={t.brand}>
-          <span className="brand-seal" aria-hidden="true">ح</span>
-          <span className="brand-name"><strong>{t.brand}</strong><small>{t.eyebrow}</small></span>
+  const themeLabel = dark ? (ar ? 'الوضع النهاري' : 'Light mode') : (ar ? 'الوضع الليلي' : 'Dark mode');
+  function toggleTheme() {
+    const value = dark ? 'light' : 'dark';
+    document.documentElement.dataset.theme = value;
+    try { localStorage.setItem('diwan-theme', value); } catch {}
+    window.dispatchEvent(new Event(themeEvent));
+  }
+
+  return <header className="site-header">
+    <div className="utility-bar"><div className="container utility-inner">
+      <span>{ar ? 'مبادرة أهلية مستقلة' : 'Independent community initiative'}</span>
+      <div className="header-actions">
+        <Link className="utility-action" href={`/${nextLocale}${suffix}/`} hrefLang={nextLocale} lang={nextLocale}>
+          <Globe2 size={17} aria-hidden="true" />{ar ? 'English' : 'العربية'}
         </Link>
-        <nav className="main-nav" aria-label={locale === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'}>
-          {entries.map((entry) => <Link key={entry.path} href={`/${locale}${entry.path}`}>{entry.label}</Link>)}
-        </nav>
-        <div className="header-actions">
-          <Link className="language-switch" href={locale === 'ar' ? '/en' : '/ar'} hrefLang={locale === 'ar' ? 'en' : 'ar'}>{locale === 'ar' ? 'EN' : 'عربي'}</Link>
-        </div>
+        <button className="utility-action" type="button" onClick={toggleTheme} aria-label={themeLabel} title={themeLabel}>
+          {dark ? <Sun size={19} aria-hidden="true" /> : <Moon size={19} aria-hidden="true" />}
+        </button>
       </div>
-    </header>
-  );
+    </div></div>
+    <div className="container header-inner">
+      <Link className="brand" href={`/${locale}/`}>
+        <span className="brand-seal"><GitBranch size={25} aria-hidden="true" /></span>
+        <span className="brand-name"><strong>{t.brand}</strong><small>{t.eyebrow}</small></span>
+      </Link>
+      <nav className="main-nav" aria-label={ar ? 'التنقل الرئيسي' : 'Main navigation'}>
+        {entries.map(({path, label, Icon}) => {
+          const active = pathname === `/${locale}${path}` || (!pathname && !path);
+          return <Link key={path} href={`/${locale}${path}/`} aria-current={active ? 'page' : undefined}>
+            <Icon size={18} aria-hidden="true" />{label}
+          </Link>;
+        })}
+      </nav>
+    </div>
+  </header>;
 }

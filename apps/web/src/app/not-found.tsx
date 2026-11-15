@@ -1,6 +1,14 @@
 import Link from 'next/link';
+import { AlertCircle } from 'lucide-react';
+import { PortalShell } from '@/components/portal-shell';
+
 export default function NotFound() {
-  return <main style={{ minHeight: '80vh', display: 'grid', placeContent: 'center', textAlign: 'center', padding: 24 }}>
-    <h1>404</h1><p>الصفحة غير موجودة — Page not found</p><Link href="/ar">العودة للرئيسية</Link>
-  </main>;
+  return <PortalShell locale="ar">
+    <main id="main-content" className="container inner-page">
+      <div className="inner-eyebrow"><AlertCircle size={19} aria-hidden="true" />404</div>
+      <h1>الصفحة غير موجودة</h1>
+      <p className="inner-lead">قد يكون الرابط قديمًا. يمكنك العودة للرئيسية واختيار القسم المطلوب.</p>
+      <Link className="text-link" href="/">العودة للرئيسية</Link>
+    </main>
+  </PortalShell>;
 }
