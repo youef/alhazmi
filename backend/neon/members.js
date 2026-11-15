@@ -1,17 +1,19 @@
+import { createHash } from 'node:crypto';
 import { accountFromId, HttpError, route } from './shared.js';
 import { accessibleModules, readModule } from './api.js';
 import { memberAuth } from './member-auth.js';
-import { authPage, dashboard, memberHome, moduleNames, modulePage, page, profilePage } from './member-views.js';
+import { authPage, dashboard, memberHome, moduleNames, modulePage, page, profilePage, portalScript } from './member-views.js';
 
 const publicForms = new Set(['login', 'register', 'verify', 'forgot', 'reset']);
 const maxFormBytes = 8192;
 const minute = 60;
+const inlineScriptHash = createHash('sha256').update(portalScript).digest('base64');
 
 function headersForPage() {
   return new Headers({
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store, private',
-    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${inlineScriptHash}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
     'X-Content-Type-Options': 'nosniff',
     // HTML form submissions need a non-opaque Origin for the CSRF check.
     'Referrer-Policy': 'same-origin',
