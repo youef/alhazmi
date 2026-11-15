@@ -1,21 +1,18 @@
 {
-  "name": "alhazmi-neon-functions",
-  "version": "1.0.0",
+  "name": "alhazmi-diwani",
   "private": true,
-  "type": "module",
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "build": "node ./backend/neon/build.mjs",
-    "check": "node --check backend/neon/api.js && node --check backend/neon/uploads.js && node --check backend/neon/shared.js"
+    "dev": "npm run dev --workspace @alhazmi/web",
+    "build": "npm run build --workspace @alhazmi/web",
+    "typecheck": "npm run typecheck --workspace @alhazmi/web",
+    "lint": "npm run lint --workspace @alhazmi/web",
+    "test": "npm run test --workspace @alhazmi/web"
   },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.900.0",
-    "@aws-sdk/s3-request-presigner": "^3.900.0",
-    "@neon/config": "^1.13.0",
-    "@neon/functions": "^0.8.0",
-    "jose": "^6.0.0",
-    "pg": "^8.16.0"
-  },
-  "devDependencies": {
-    "esbuild": "^0.25.0"
+  "engines": {
+    "node": ">=20.9.0"
   }
 }
