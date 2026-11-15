@@ -103,8 +103,19 @@ export function familyAdminView(data,csrf,done){
     +'<label class="family-checkbox"><input type="checkbox" name="confirm_evidence" value="yes" required> تحققت من صلة القرابة ومستنداتها</label>',
     'اعتماد العلاقة النهائية');
   }
+  const details=q.proposed_details||{};
+  const dataCard='<details class="family-details"><summary>بيانات مقدم الطلب</summary>'
+   +'<p>تاريخ الميلاد: '+e(q.proposed_birth_date?date(q.proposed_birth_date):'غير مذكور')+'</p>'
+   +'<p>الجنس: '+e(q.proposed_gender||'غير محدد')+'</p>'
+   +'<p>الأب: '+e(details.father_name_ar||'غير مذكور')+'</p>'
+   +'<p>الأم: '+e(details.mother_name_ar||'غير مذكور')+'</p>'
+   +'<p>مكان الميلاد: '+e(details.birthplace||'غير مذكور')+'</p>'
+   +'<p>الجنسية: '+e(details.nationality||'غير مذكورة')+'</p>'
+   +'<p>مرجع الإثبات: '+e(details.record_reference||'غير مذكور')+'</p>'
+   +'<p>الوثيقة: '+e(q.identifier_type||'غير مذكور')+(q.identifier_last4?' (آخر 4 أحرف فقط: '+e(q.identifier_last4)+')':'')+'</p>'
+   +'<p>ملاحظات: '+e(q.proposed_notes||'لا توجد')+'</p></details>';
   return row([e(q.proposed_name_ar),e(relationshipLabels[q.relationship]||q.relationship),
-   e(q.family_name)+' / '+e(q.fakhth_name),e(q.email),pills(q.status),next+followUp]);
+   e(q.family_name)+' / '+e(q.fakhth_name),e(q.email),pills(q.status),dataCard+next+followUp]);
  });
  const linkFields=select('المستخدم صاحب البريد المؤكد','account',data.accounts,'id',a=>a.email,true)
   +select('السجل الموثّق المطلوب ربطه','person',data.parents,'id',p=>p.name,true)
