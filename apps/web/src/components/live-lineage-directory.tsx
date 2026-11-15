@@ -38,8 +38,7 @@ function TreeNode({ node, ar, expanded, onToggle }: {
 
   const open = expanded.has(node.unit.id);
   return <li>
-    <button type="button" className="tree-toggle" aria-expanded={open}
-      aria-controls={`tree-children-${node.unit.id}`} onClick={() => onToggle(node.unit.id)}>
+    <button type="button" className="tree-toggle" aria-expanded={open} onClick={() => onToggle(node.unit.id)}>
       {label}
       <span className="tree-child-count">{node.children.length} {ar ? 'تابع' : 'children'}</span>
       <ChevronDown size={17} className="tree-chevron" aria-hidden="true" />
