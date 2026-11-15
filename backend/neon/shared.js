@@ -20,10 +20,13 @@ export async function userFrom(req){
  let payload;
  try{({payload}=await jwtVerify(match[1],jwks,{issuer:new URL(authBase).origin}));}
  catch{throw new HttpError(401,'Invalid or expired session');}
- if(!isId(payload.sub))throw new HttpError(401,'Invalid subject');
+ return accountFromId(payload.sub);
+}
+export async function accountFromId(id){
+ if(!isId(id))throw new HttpError(401,'Invalid subject');
  const result=await pool.query(
    'select u.id,p.person_id,p.account_status,pe.tribe_id,pe.family_unit_id,pe.record_status from neon_auth."user" u left join public.user_profiles p on p.user_id=u.id left join public.people pe on pe.id=p.person_id where u.id=$1 and u.banned is distinct from true and u."emailVerified" is true limit 1',
-   [payload.sub]);
+   [id]);
  if(!result.rows.length)throw new HttpError(401,'Account not found');
  const u=result.rows[0];
  if(u.account_status==='suspended')throw new HttpError(403,'Account suspended');

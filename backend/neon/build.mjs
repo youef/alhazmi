@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-for (const file of ['api','uploads']) {
+for (const file of ['api','uploads','members']) {
   await build({
     entryPoints: [`backend/neon/${file}.js`],
     bundle: true,
