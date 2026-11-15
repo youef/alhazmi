@@ -6,6 +6,7 @@ for (const file of ['api','uploads']) {
     platform: 'node',
     target: 'node24',
     format: 'esm',
+    banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
     outfile: `dist/${file}/index.mjs`,
     external: ['pg-native'],
     logLevel: 'info'
