@@ -14,7 +14,7 @@ jobs:
         with: { node-version: '24' }
       - run: npm install --no-audit --no-fund
       - run: npm run check
-      - run: npm run build
+      - run: npm run functions:build
       - run: |
           test -s dist/api/index.mjs
           test -s dist/uploads/index.mjs
@@ -34,6 +34,7 @@ jobs:
               pathlib.Path(f'.neon-deploy/{name}.zip.b64').write_text(base64.b64encode(b.getvalue()).decode())
           PY
       - name: Publish deploy bundles for connector handoff
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

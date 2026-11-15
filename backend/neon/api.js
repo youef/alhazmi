@@ -26,6 +26,36 @@ const MODULES={
  audit:{permission:'audit.read',query:'select id,actor_user_id,event_type,outcome,created_at from public.permission_audit_events order by created_at desc limit 40',mode:'none'},
  backups:{permission:'backup.read_status',query:'select id,backup_kind,started_at,completed_at,result from public.backup_runs order by started_at desc limit 40',mode:'none'}
 };
+
+// PUBLIC DIRECTORY: only reviewer-approved lineage units are eligible for disclosure.
+// A unit marked needs_review is never returned, even if a parent is approved.
+const ALLOWED_PUBLIC_ORIGINS = new Set(['https://youef.github.io','http://localhost:3000']);
+function publicCors(req) {
+ const origin=req.headers.get('origin');
+ return origin&&ALLOWED_PUBLIC_ORIGINS.has(origin)
+  ? {'Access-Control-Allow-Origin':origin,'Vary':'Origin','Access-Control-Allow-Methods':'GET, OPTIONS','Access-Control-Allow-Headers':'Content-Type'}
+  : {};
+}
+async function publicLineage(req) {
+ const url=new URL(req.url);
+ const requested=Number(url.searchParams.get('limit')||50);
+ const offset=Number(url.searchParams.get('offset')||0);
+ if(!Number.isInteger(requested)||requested<1||requested>100||!Number.isSafeInteger(offset)||offset<0||offset>100000)throw new HttpError(400,'Invalid pagination');
+ const r=await pool.query(
+  `select l.id,l.parent_id,l.unit_type,l.name_ar,l.name_en
+    from public.lineage_units l
+    where exists (
+      select 1 from public.lineage_seed_reviews review
+      where review.unit_id=l.id and review.review_status='approved'
+      and review.verified_at is not null
+    )
+    order by l.name_ar,l.id limit $1 offset $2`,
+  [requested,offset]
+ );
+ return Response.json({data:r.rows,meta:{limit:requested,offset,nextOffset:r.rows.length===requested?offset+requested:null,reviewStatus:'approved'}},
+ {headers:{...publicCors(req),'Cache-Control':'public,max-age=60','X-Content-Type-Options':'nosniff'}});
+}
+
 async function readModule(name,u){
  const def=MODULES[name];if(!def)throw new HttpError(404,'Unknown module');
  const own=await requireOwn(u); // no listing of family info for unlinked accounts
@@ -52,6 +82,8 @@ export default {async fetch(req){
  try{
   const pathname=route(req);
   if(pathname==='/health')return json({ok:true,service:'alhazmi-api',version:1,auth:'required-on-data'});
+  if(pathname==='/v1/public/lineage' && req.method==='OPTIONS')return new Response(null,{status:204,headers:publicCors(req)});
+  if(pathname==='/v1/public/lineage' && req.method==='GET')return await publicLineage(req);
   const u=await userFrom(req);
   if(pathname==='/v1/modules'&&req.method==='GET')return json({modules:Object.keys(MODULES),note:'Returned data depends on verified roles, assignments, purpose and person scope'});
   if(pathname==='/v1/me'&&req.method==='GET')return json({id:u.id,linkedPersonId:u.person_id||null,status:u.account_status||'unlinked'});
