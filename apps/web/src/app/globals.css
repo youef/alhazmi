@@ -274,3 +274,35 @@ button { cursor: pointer; }
 .directory-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px #077b4c16}
 @media (max-width:819px){.site-header{position:relative}.main-nav{padding-bottom:3px}}
 @media (prefers-reduced-motion:reduce){.main-nav a{transition:none}}
+
+
+/* Approved genealogy tree: touch-friendly and keyboard-accessible disclosure buttons. */
+.unit-tree .tree-toggle {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  text-align: start;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.unit-tree .tree-toggle:hover { border-color: var(--accent); background: var(--soft); }
+.unit-tree .tree-toggle:focus-visible { outline: 3px solid #b98c32; outline-offset: 3px; }
+.unit-tree .tree-toggle svg { color: var(--accent); flex: 0 0 auto; }
+.unit-tree .tree-toggle[aria-expanded="true"] .tree-chevron { transform: rotate(180deg); }
+.tree-child-count {
+  border-radius: 99px;
+  padding: 2px 9px;
+  font-size: .75rem;
+  color: var(--muted);
+  background: var(--canvas);
+}
+.unit-tree .tree-toggle .tree-chevron { margin-inline-start: auto; }
