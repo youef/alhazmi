@@ -87,7 +87,8 @@ export function familyAdminView(data,csrf,done){
    '<input type="hidden" name="request" value="'+e(q.id)+'"><input type="hidden" name="expected" value="'+e(q.status)+'">'
    +'<label>القرار<select name="decision"><option value="under_review">بدء المراجعة</option><option value="needs_evidence">طلب إثباتات</option><option value="rejected">رفض</option><option value="approved">قبول أولي كسجل غير موثّق</option></select></label>'
    +'<label>ملاحظات وإثباتات المراجعة<textarea name="note" required minlength="10" maxlength="700"></textarea></label>'
-   +'<label class="family-checkbox"><input type="checkbox" name="confirm_evidence" value="yes"> أؤكد مراجعة الإثباتات قبل الموافقة الأولية</label>',
+   +'<label class="family-checkbox"><input type="checkbox" name="confirm_evidence" value="yes"> أؤكد مراجعة الإثباتات قبل الموافقة الأولية</label>'
+   +(q.linked_person_id?'<p class="family-callout family-warning">سجل داخلي مطابق للبصمة: '+e(q.matched_person_name||'اسم خاص')+'. تحقق من هوية صاحب السجل قبل الموافقة.</p><label class="family-checkbox"><input type="checkbox" name="confirm_existing" value="yes"> أؤكد مطابقة صاحب السجل الموجود مع المستندات</label>':''),
    'تسجيل القرار')+'</details>':'<span class="family-slim">تم البت</span>';
   let followUp='';
   if(q.status==='approved'&&q.created_person_id&&q.person_record_status==='under_review'){
