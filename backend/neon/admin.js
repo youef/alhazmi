@@ -111,7 +111,7 @@ async function reviewClaim(db,u,f){
 }
 async function createService(db,u,f){
  const key=clip(f.get('key'),90),title=clip(f.get('title'),120),description=clip(f.get('description'),600),visibility=clip(f.get('visibility'),30);
- if(!/^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$/.test(key)||title.length<3||!['authenticated','authorized_family','admins'].includes(visibility))throw new HttpError(400,'Invalid service details');
+ if(!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(key)||title.length<3||!['authenticated','authorized_family','admins'].includes(visibility))throw new HttpError(400,'Invalid service details');
  const r=await db.query("insert into public.service_definitions(service_key,title_ar,description_ar,visibility,status) values($1,$2,$3,$4,'draft') returning id",[key,title,description||null,visibility]);
  await auditWrite(db,u,'admin_service_created',{id:r.rows[0].id,key});
 }
