@@ -2,7 +2,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { authorized, HttpError, isId, pool } from './shared.js';
 
-export const ADMIN_SECTIONS=['overview','members','requests','services','claims','roles','audit','system'];
+export const ADMIN_SECTIONS=['overview','kinship','members','requests','services','claims','roles','audit','system'];
 const n=18;
 const clip=(v,max=100)=>typeof v==='string'?v.trim().slice(0,max):'';
 const guard=async(u,p='roles.view')=>{if(!await authorized(u,p))throw new HttpError(403,'Access denied');};
@@ -43,6 +43,27 @@ export async function adminData(u,section,url){
    pool.query('select a.id,a.event_type,a.outcome,a.created_at,u.email from public.permission_audit_events a left join neon_auth."user" u on u.id=a.actor_user_id order by a.id desc limit 7'),
   ]);
   return {filter,data:{metrics,recent:recent.rows,events:events.rows}};
+ }
+ if(section==='kinship'){
+  // Only self-created records are returned; no public API exposes these living persons.
+  const [profile,people,marriages]=await Promise.all([
+    pool.query('select person_id from public.user_profiles where user_id=$1',[u.id]),
+    pool.query(`select p.id,p.full_name_ar,p.given_name_ar,p.gender,p.father_id,p.mother_id,
+      p.birth_place,p.biography,p.record_status,p.visibility,
+      l.name_ar as family_name,
+      (select pl.name_ar from public.person_residences r join public.places pl on pl.id=r.place_id
+       where r.person_id=p.id and r.current_residence order by r.id desc limit 1) as residence,
+      exists(select 1 from public.person_employment em where em.person_id=p.id and em.kind='retired') as retired
+      from public.people p left join public.lineage_units l on l.id=p.family_unit_id
+      where p.created_by=$1 and p.visibility='private'
+      order by p.created_at,p.id limit 200`,[u.id]),
+    pool.query(`select m.partner_a_id,m.partner_b_id,m.status from public.marriages m
+      join public.people a on a.id=m.partner_a_id
+      join public.people b on b.id=m.partner_b_id
+      where a.created_by=$1 and b.created_by=$1 and m.status in ('reported','current')
+      order by m.created_at limit 100`,[u.id]),
+  ]);
+  return {filter,data:{viewerId:profile.rows[0]?.person_id||null,people:people.rows,marriages:marriages.rows}};
  }
  if(section==='members'){
   const where=" where ($1='' or position(lower($1) in lower(coalesce(u.email,'')||' '||coalesce(u.name,'')))>0)";
