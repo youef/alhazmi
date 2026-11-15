@@ -1,13 +1,12 @@
 import {pool,userFrom,authorized,requireOwn,json,fail,route,HttpError,isId} from './shared.js';
-const MAX_ROWS=40;
 const MODULES={
  profile:{permission:null,query:'select id,full_name_ar,given_name_ar,record_status,visibility,family_unit_id from public.people where id=$1',mode:'person'},
- tree:{permission:'lineage.read',query:'select id,parent_id,unit_type,name_ar from public.lineage_units where tribe_id=$1 order by name_ar limit 500',mode:'tribe'},
- family:{permission:'family.read',query:"select id,full_name_ar,record_status from public.people where family_unit_id=$1 and record_status='verified' order by full_name_ar limit 40",mode:'unit'},
+ tree:{permission:'lineage.read',query:`select id,parent_id,unit_type,name_ar from public.lineage_units l where tribe_id=$1 and exists (select 1 from public.lineage_seed_reviews r where r.unit_id=l.id and r.review_status='approved' and r.verified_at is not null and r.verified_by is not null) order by name_ar limit 500`,mode:'tribe'},
+ family:{permission:'family.read',query:"select id,full_name_ar,record_status from public.people where family_unit_id=$1 and record_status='verified' and visibility in ('approved_family','approved_members','public_biography') order by full_name_ar limit 40",mode:'unit'},
  requests:{permission:null,query:'select id,request_type,status,created_at,reviewed_at from public.change_requests where submitter_id=$1 order by created_at desc limit 40',mode:'user'},
  serviceRequests:{permission:null,query:'select id,service_id,state,created_at from public.member_service_requests where user_id=$1 order by created_at desc limit 40',mode:'user'},
  services:{permission:null,query:"select id,service_key,title_ar,description_ar from public.service_definitions where status='active' and visibility='authenticated' limit 40",mode:'none'},
- documents:{permission:null,query:'select a.id,a.title,a.item_type,a.review_status,a.created_at from public.archive_items a join public.archive_people ap on ap.archive_id=a.id where ap.person_id=$1 order by a.created_at desc limit 40',mode:'person'},
+ documents:{permission:null,query:`select a.id,a.title,a.item_type,a.review_status,a.created_at from public.archive_items a join public.archive_people ap on ap.archive_id=a.id where ap.person_id=$1 and a.review_status='approved' and a.visibility in ('approved_members','public') order by a.created_at desc limit 40`,mode:'person'},
  notifications:{permission:null,query:'select id,title,category,read_at,created_at from public.notifications where user_id=$1 order by created_at desc limit 40',mode:'user'},
  activity:{permission:null,query:'select id,event_code,outcome,created_at from public.user_security_events where user_id=$1 order by created_at desc limit 40',mode:'user'},
  membership:{permission:null,query:'select id,version,card_status,issued_at,expires_at from public.membership_cards where person_id=$1 and revoked_at is null order by issued_at desc limit 5',mode:'person'},
@@ -64,13 +63,37 @@ async function publicLineage(req) {
  {headers:{...publicCors(req),'Cache-Control':'public,max-age=60','X-Content-Type-Options':'nosniff'}});
 }
 
-async function readModule(name,u){
- const def=Object.hasOwn(MODULES,name)?MODULES[name]:null;if(!def)throw new HttpError(404,'Unknown module');
- const own=await requireOwn(u); // no listing of family info for unlinked accounts
- if(def.permission&&!await authorized(u,def.permission,own))throw new HttpError(403,'Permission denied');
- if ((name==='audit'||name==='backups'||name==='forms') && !await authorized(u,def.permission))throw new HttpError(403,'System scope required');
+const SYSTEM_MODULES = new Set(['audit', 'backups', 'forms']);
+
+async function canReadModule(name, user, own) {
+ const definition = MODULES[name];
+ if (definition.mode === 'unit' && !own.unitId) return false;
+ if (!definition.permission) return true;
+ if (SYSTEM_MODULES.has(name)) return authorized(user, definition.permission);
+ const target = { tribeId: own.tribeId };
+ if (definition.mode === 'unit') target.unitId = own.unitId;
+ if (definition.mode === 'person') target.personId = own.personId;
+ return authorized(user, definition.permission, target);
+}
+
+export async function accessibleModules(user) {
+ let own;
+ try { own = await requireOwn(user); }
+ catch (error) {
+  if (error instanceof HttpError && error.status === 403) return [];
+  throw error;
+ }
+ const names = Object.keys(MODULES);
+ const allowed = await Promise.all(names.map(name => canReadModule(name, user, own)));
+ return names.filter((name, index) => allowed[index]);
+}
+
+export async function readModule(name,u){
+ const def=Object.hasOwn(MODULES,name)?MODULES[name]:null;
+ if(!def)throw new HttpError(404,'Unknown module');
+ const own=await requireOwn(u);
+ if(!await canReadModule(name,u,own))throw new HttpError(403,'Permission denied');
  const param=def.mode==='user'?u.id:def.mode==='person'?own.personId:def.mode==='unit'?own.unitId:def.mode==='tribe'?own.tribeId:undefined;
- if(def.mode==='unit'&&!param)throw new HttpError(403,'Family scope required');
  const result=await pool.query(def.query,param===undefined?[]:[param]);
  return {module:name,items:result.rows};
 }
@@ -94,7 +117,7 @@ export default {async fetch(req){
   if(pathname==='/v1/public/lineage' && req.method==='OPTIONS')return new Response(null,{status:204,headers:publicCors(req)});
   if(pathname==='/v1/public/lineage' && req.method==='GET')return await publicLineage(req);
   const u=await userFrom(req);
-  if(pathname==='/v1/modules'&&req.method==='GET')return json({modules:Object.keys(MODULES),note:'Returned data depends on verified roles, assignments, purpose and person scope'});
+  if(pathname==='/v1/modules'&&req.method==='GET')return json({modules:await accessibleModules(u)});
   if(pathname==='/v1/me'&&req.method==='GET')return json({id:u.id,linkedPersonId:u.person_id||null,status:u.account_status||'unlinked'});
   if(pathname==='/v1/requests'&&req.method==='POST')return await submit(req,u);
   const m=/^\/v1\/data\/([a-zA-Z]+)$/.exec(pathname);
