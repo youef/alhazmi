@@ -89,3 +89,38 @@ test('stale request review cannot overwrite newer decisions',async()=>{
  assert.equal(log.at(-1),'rollback');
  assert.ok(!log.some(sql=>sql.includes('insert into public.permission_audit_events')));
 });
+
+test('private kinship tree shows named grandparents and derives relatives without inventing uncles',()=>{
+ const people=[
+  {id:'gf',given_name_ar:'رطيان',full_name_ar:'رطيان مطر',record_status:'under_review',gender:'male',family_name:'الشجارين'},
+  {id:'gm',given_name_ar:'هله',full_name_ar:'هله مطير',record_status:'under_review',gender:'female',family_name:'الحضيري'},
+  {id:'dad',given_name_ar:'ثنيان',full_name_ar:'ثنيان رطيان',father_id:'gf',mother_id:'gm',record_status:'under_review',gender:'male'},
+  {id:'uncle',given_name_ar:'محمد',full_name_ar:'محمد رطيان',father_id:'gf',mother_id:'gm',record_status:'under_review',gender:'male'},
+  {id:'mom',given_name_ar:'السمراء',full_name_ar:'السمراء سالم',record_status:'under_review',gender:'female'},
+  {id:'self',given_name_ar:'يوسف',full_name_ar:'يوسف ثنيان',father_id:'dad',mother_id:'mom',record_status:'under_review',gender:'male'},
+  {id:'wife',given_name_ar:'أسيل',full_name_ar:'أسيل جميل',record_status:'under_review',gender:'female'},
+  {id:'kid',given_name_ar:'وتين',full_name_ar:'وتين يوسف',father_id:'self',mother_id:'wife',record_status:'under_review',gender:'female'}
+ ];
+ const html=adminView('kinship',{name:'X'},{viewerId:'self',people,marriages:[{partner_a_id:'self',partner_b_id:'wife',status:'reported'}]}, {q:'',status:'',page:1},'f'.repeat(64));
+ assert.match(html,/شجرة عائلتي/);
+ assert.match(html,/محمد رطيان/);
+ assert.match(html,/الأعمام/);
+ assert.match(html,/لم تُسجّل أسماء الأخوال/);
+ assert.match(html,/وتين يوسف/);
+ assert.match(html,/خاص/);
+});
+
+test('kinship data can only be read by the system admin',async()=>{
+ scope='tribe';
+ await assert.rejects(()=>adminData(member,'kinship',new URL(base+'/admin/kinship')),error=>error.status===403);
+ scope='system';
+ pool.query=async(sql,args)=>{
+  if(sql.includes('user_custom_role_assignments a')&&sql.includes('crp.decision'))return {rows:[{decision:'allow',scope_type:'system'}]};
+  if(sql.includes('permission_overrides o'))return {rows:[]};
+  if(sql.includes('user_profiles'))return {rows:[{person_id:'self'}]};
+  return {rows:[]};
+ };
+ const result=await adminData(member,'kinship',new URL(base+'/admin/kinship'));
+ assert.equal(result.data.viewerId,'self');
+ assert.deepEqual(result.data.people,[]);
+});
