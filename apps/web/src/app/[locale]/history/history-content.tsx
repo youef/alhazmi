@@ -52,6 +52,13 @@ const sources = [
     url: 'https://www.orient-institut.org/research/previous-projects/bedouin-syria-johann-buessow.html',
     type: {ar: 'بحث أكاديمي',en: 'Academic study'},
   },
+  {
+    id: 's7',
+    name: {ar: 'عبدالله بن عبار — توضيح حول نسب قبيلة الحازم (2021)',en: 'Abdullah bin Abbar — Hazm genealogy clarification (2021)'},
+    note: {ar: 'مادة بحثية منشورة تستعرض الروايات والشهادات وتذكر وقائع ارتبطت بعرعر. تُعد رواية كاتبها وليست تعدادًا رسميًا للسكان.',en: 'A published genealogical account referring to Hazm-related historical events in Arar; an author’s account, not an official population census.'},
+    url: 'https://www.bnabar.com/vb/showthread.php?t=12387',
+    type: {ar: 'مقال أنساب وروايات',en: 'Genealogical account'},
+  },
 ];
 
 const divisions = [
@@ -110,6 +117,24 @@ const notableGroups = [
     text: {ar: 'ورد اسمه في إعداد مادة «وثيقتان عن أصل قبيلة الحازم» المنشورة عام 2008، وهي من المواد التي تتيح للباحثين الرجوع إلى نصوص الشهادات والرواية الأسرية.',en: 'Credited as the compiler of the 2008 publication “Two documents on the origin of Hazm”, containing testimony transcriptions and a family narrative.'},
     source: 's2',
   },
+  {
+    title: {ar: 'حسن الربح',en: 'Hassan Al-Ribh'},
+    type: {ar: 'اسم ورد ضمن فرسان الحازم في تدوين 2024',en: 'Named among Hazm horsemen in a 2024 genealogical record'},
+    text: {ar: 'يذكره عبدالله بن عبار ضمن أسماء فرسان الحازم. تُعرض المعلومة بنسبتها إلى صاحب التدوين، دون إضافة تواريخ أو أدوار لم تُتحقق من مصادر مستقلة.',en: 'Abdullah bin Abbar lists him among Hazm horsemen. This is attributed to the compiler, without invented dates or independently unverified claims.'},
+    source: 's4',
+  },
+  {
+    title: {ar: 'بصيص بن خضر',en: 'Busais bin Khidr'},
+    type: {ar: 'اسم ورد ضمن فرسان الحازم في تدوين 2024',en: 'Named among Hazm horsemen in a 2024 genealogical record'},
+    text: {ar: 'ترد تسميته في السجل المنشور ضمن الأسماء المرتبطة بالفرسان، ويُلحق به لقب «راعي جديعا» في المصدر. لا تتوفر في المصادر المستخدمة ترجمة مستقلة مفصلة له.',en: 'Recorded among the historical horsemen with the epithet “Ra‘i Jaday‘a”. No separate, independently verified biography is available in the cited material.'},
+    source: 's4',
+  },
+  {
+    title: {ar: 'فهد بطي المرسال',en: 'Fahd Batti Al-Mirsal'},
+    type: {ar: 'اسم تاريخي ورد في توثيق الفدعان',en: 'Name recorded in Fad’an genealogical literature'},
+    text: {ar: 'أورده عبدالله بن عبار في قائمة فرسان الحازم المشاركين في توحيد المملكة. هذه شهادة من مؤلف التدوين، ولم تُثبت هنا بتوثيق أرشيفي مستقل.',en: 'Abdullah bin Abbar includes him in a list of Hazm horsemen associated with Saudi unification. This claim remains attributed to the published genealogical record.'},
+    source: 's4',
+  },
 ];
 
 const places = [
@@ -134,8 +159,8 @@ const places = [
   {
     title: {ar: 'الاستقرار المعاصر',en: 'Modern settlement'},
     category: {ar: 'يحتاج توثيقًا ميدانيًا',en: 'Requires verified local records'},
-    text: {ar: 'انتقلت أسر كثيرة من حياة التنقل إلى المدن عبر أجيال. لا تتوفر في المصادر المستخدمة هنا إحصائية حديثة موثقة لتوزيع جميع أسر الحازم مدينةً بمدينة؛ ويمكن إضافتها بعد مراجعة المصادر والموافقات.',en: 'Households transitioned from pastoral mobility to city life over generations. The sources used here do not establish an up-to-date city-by-city distribution of all Hazm families.'},
-    source: 's6',
+    text: {ar: 'تذكر مادة نسب منشورة صلة تاريخية لأبناء الحازم بمدينة عرعر في سياق استقبال أحد شيوخ الفدعان، وترد الجوف في الروايات الأقدم. لا تتوفر إحصائية حديثة موثقة لعدد الأسر أو انتشارها في جميع المدن.',en: 'A published genealogical account refers to Hazm families in Arar in a historical encounter with a Fad’an sheikh; older family narratives also mention Al-Jawf. No verified modern city-by-city population count is established.'},
+    source: 's7',
   },
 ];
 
