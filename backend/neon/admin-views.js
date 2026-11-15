@@ -14,8 +14,8 @@ const ICONS={
  system:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h10 M7 13h10"/>',
 };
 const icon=(name,size=22)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[name]||ICONS.overview)+'</svg>';
-const names={overview:'نظرة عامة',members:'الأعضاء',requests:'طلبات التغيير',services:'الخدمات',claims:'ربط السجلات',roles:'الأدوار والصلاحيات',audit:'سجل التدقيق',system:'حالة النظام'};
-const navOrder=['overview','members','requests','services','claims','roles','audit','system'];
+const names={overview:'نظرة عامة',members:'الأعضاء',requests:'طلبات التغيير',services:'الخدمات',claims:'ربط السجلات',roles:'الأدوار والصلاحيات',supervisors:'مشرفو الأفخاذ والعائلات',audit:'سجل التدقيق',system:'حالة النظام'};
+const navOrder=['overview','members','requests','services','claims','roles','supervisors','audit','system'];
 const css=`
 .adm-root{--a:#076a45;--b:#075138;--sub:#6a7c72;--bd:#deebe3;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px;align-items:start}
 .adm-side{background:#fff;border:1px solid var(--bd);border-radius:20px;position:sticky;top:108px;padding:14px;box-shadow:0 14px 34px #06452a0a}
