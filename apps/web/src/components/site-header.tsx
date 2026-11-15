@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Archive, BookOpenText, GitBranch, Globe2, House, LogIn, Moon, Sun, UsersRound } from 'lucide-react';
+import { Archive, BookOpenText, GitBranch, Globe2, CircleUserRound, House, Moon, Sun, UsersRound } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { getDictionary, type Locale } from '@/lib/i18n';
 
-const membersLogin = 'https://br-flat-boat-azy2ouq3-diwanmembers.compute.c-3.ap-southeast-1.aws.neon.tech/login';
+const memberDashboard = 'https://br-flat-boat-azy2ouq3-diwanmembers.compute.c-3.ap-southeast-1.aws.neon.tech/dashboard';
 const themeEvent = 'diwan-theme';
 function subscribe(listener: () => void) {
   const preference = window.matchMedia('(prefers-color-scheme: dark)');
@@ -49,7 +49,7 @@ export function SiteHeader({ locale }: { locale: Locale }) {
     <div className="utility-bar"><div className="container utility-inner">
       <span>{ar ? 'مبادرة أهلية مستقلة' : 'Independent community initiative'}</span>
       <div className="header-actions">
-        <a className="utility-action" href={membersLogin}><LogIn size={17} aria-hidden="true" />{ar ? 'دخول الأعضاء' : 'Member login'}</a>
+        <a className="utility-action" href={memberDashboard}><CircleUserRound size={17} aria-hidden="true" />{ar ? 'حسابي' : 'My account'}</a>
         <Link className="utility-action" href={`/${nextLocale}${suffix}/`} hrefLang={nextLocale} lang={nextLocale}>
           <Globe2 size={17} aria-hidden="true" />{ar ? 'English' : 'العربية'}
         </Link>

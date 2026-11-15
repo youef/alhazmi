@@ -6,6 +6,8 @@ import {
   serializeSetCookie,
 } from '@neondatabase/auth/server';
 
+const rememberPreferenceCookie = NEON_AUTH_SESSION_COOKIE_NAME.replace(/session_token$/, 'dont_remember');
+
 export function memberAuth(request, headers, origin) {
   const cookies = extractNeonAuthCookies(request.headers);
   const auth = createAuthServer({
@@ -18,7 +20,7 @@ export function memberAuth(request, headers, origin) {
       getFramework: () => 'node',
       setCookie(name, value, options) {
         // Session data is fetched fresh for protected pages.
-        if (name !== NEON_AUTH_SESSION_COOKIE_NAME) return;
+        if (name !== NEON_AUTH_SESSION_COOKIE_NAME && name !== rememberPreferenceCookie) return;
         headers.append('Set-Cookie', serializeSetCookie({
           name, value, path: '/', expires: options.expires, maxAge: options.maxAge,
           sameSite: 'lax', secure: true, httpOnly: true,

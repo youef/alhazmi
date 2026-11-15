@@ -100,3 +100,44 @@ test('system modules require a system scope and recheck permissions on page acce
   scope = 'tribe';
   assert.equal((await members.fetch(request('/dashboard/audit'))).status, 403);
 });
+
+test('member home reflects the saved session and signed-in users skip the login form', async () => {
+  const guest = await members.fetch(new Request(`${origin}/`));
+  assert.match(await guest.text(), /href="\/register"/);
+
+  const home = await members.fetch(new Request(`${origin}/`, { headers }));
+  const body = await home.text();
+  assert.equal(home.status, 200);
+  assert.match(body, /href="\/dashboard"/);
+  assert.match(body, /action="\/logout"/);
+  assert.match(home.headers.get('cache-control'), /no-store/);
+
+  const login = await members.fetch(new Request(`${origin}/login`, { headers }));
+  assert.equal(login.status, 303);
+  assert.equal(login.headers.get('location'), '/dashboard');
+});
+
+test('remember me forwards the preference and preserves secure session cookie attributes', async () => {
+  for (const remember of [true, false]) {
+    globalThis.fetch = async (url, options) => {
+      if (new URL(url).pathname === '/auth/get-session') return Response.json(null);
+      assert.equal(new URL(url).pathname, '/auth/sign-in/email');
+      assert.equal(JSON.parse(options.body).rememberMe, remember);
+      const expires = remember ? '; Max-Age=604800' : '';
+      return Response.json({}, { headers: {
+        'Set-Cookie': `__Secure-neon-auth.session_token=fixture; Secure; HttpOnly${expires}`,
+      } });
+    };
+    const fields = new URLSearchParams({ email: 'test@example.test', password: 'test-password' });
+    if (remember) fields.set('rememberMe', 'yes');
+    const result = await members.fetch(new Request(`${origin}/login`, {
+      method: 'POST', headers: { Origin: origin }, body: fields,
+    }));
+    assert.equal(result.status, 303);
+    const [sessionCookie] = result.headers.getSetCookie();
+    assert.match(sessionCookie, /HttpOnly/i);
+    assert.match(sessionCookie, /Secure/i);
+    assert.match(sessionCookie, /SameSite=Lax/i);
+    assert.equal(/max-age=604800/i.test(sessionCookie), remember);
+  }
+});

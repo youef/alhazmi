@@ -1,7 +1,7 @@
 import { accountFromId, HttpError, route } from './shared.js';
 import { accessibleModules, readModule } from './api.js';
 import { memberAuth } from './member-auth.js';
-import { authPage, dashboard, moduleNames, modulePage, page, profilePage } from './member-views.js';
+import { authPage, dashboard, memberHome, moduleNames, modulePage, page, profilePage } from './member-views.js';
 
 const publicForms = new Set(['login', 'register', 'verify', 'forgot', 'reset']);
 const maxFormBytes = 8192;
@@ -63,7 +63,7 @@ async function submitAuth(kind, form, auth, origin, headers) {
   switch (kind) {
     case 'login': {
       if (!password || password.length > 128) return html(formError);
-      const { error } = await auth.signIn.email({ email, password });
+      const { error } = await auth.signIn.email({ email, password, rememberMe: form.get('rememberMe') === 'yes' });
       if (!error) return redirect(headers, '/dashboard');
       if (error.status >= 500) return html('خدمة تسجيل الدخول غير متاحة مؤقتًا.', 503);
       if (error.status === 429) return html('كثرت المحاولات. انتظر قليلًا ثم أعد المحاولة.', 429);
@@ -124,10 +124,25 @@ export default {
         return html(page('طلب مرفوض', '<p>أعد فتح الصفحة من بوابة الديوان الرسمية.</p>'), 403);
       }
       const { auth, session } = memberAuth(request, headers, origin);
-      if (path === '/') return redirect(headers, '/dashboard');
+      if (path === '/' && request.method === 'GET') {
+        const user = await session();
+        const account = user ? await accountFromId(user.id) : null;
+        return html(memberHome(user, account ? membershipStatus(account) : null));
+      }
       const formName = path.slice(1);
       if (publicForms.has(formName)) {
         if (request.method === 'POST') return await submitAuth(formName, await readForm(request), auth, origin, headers);
+        if (formName === 'login') {
+          const user = await session();
+          if (user) {
+            try {
+              await accountFromId(user.id);
+              return redirect(headers, '/dashboard');
+            } catch (error) {
+              if (!(error instanceof HttpError && [401, 403].includes(error.status))) throw error;
+            }
+          }
+        }
         if (formName === 'reset') {
           const token = url.searchParams.get('token') || '';
           return validToken(token) ? html(authPage(formName, '', token)) : redirect(headers, '/forgot');
@@ -147,7 +162,7 @@ export default {
       const account = await accountFromId(user.id);
       const status = membershipStatus(account);
       if (path === '/dashboard' && request.method === 'GET') {
-        return html(dashboard(user, await accessibleModules(account)));
+        return html(dashboard(user, await accessibleModules(account), status));
       }
       if (path === '/profile' && request.method === 'GET') return html(profilePage(user, status));
       if (path === '/profile' && request.method === 'POST') {
