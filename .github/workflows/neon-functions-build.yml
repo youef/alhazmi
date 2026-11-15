@@ -4,7 +4,7 @@ on:
     paths: ['backend/neon/**','neon.ts','package.json','.github/workflows/neon-functions-build.yml']
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,3 +22,23 @@ jobs:
         with:
           name: neon-function-bundles
           path: dist/
+      - name: Prepare deploy bundles for Neon MCP
+        run: |
+          python3 - <<'PY'
+          import base64, pathlib, zipfile, io
+          pathlib.Path('.neon-deploy').mkdir(exist_ok=True)
+          for name in ['api','uploads']:
+              b=io.BytesIO()
+              with zipfile.ZipFile(b,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+                  z.write(f'dist/{name}/index.mjs','index.mjs')
+              pathlib.Path(f'.neon-deploy/{name}.zip.b64').write_text(base64.b64encode(b.getvalue()).decode())
+          PY
+      - name: Publish deploy bundles for connector handoff
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .neon-deploy/*.zip.b64
+          if ! git diff --cached --quiet; then
+            git commit -m "build: stage Neon function bundles for deployment"
+            git push origin HEAD:main
+          fi
