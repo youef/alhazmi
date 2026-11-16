@@ -15,6 +15,7 @@ const requiredName=value=> {
  try {const name=cleanName(value);if(name.length<3)throw new Error('NAME_TOO_SHORT');return name;}
  catch {throw new HttpError(400,'اسم الشخص مطلوب ويجب ألا يقل عن ثلاثة أحرف');}
 };
+const safeDate=raw=>{ const value=clip(raw,10);if(!value)return null;const d=new Date(value+'T00:00:00Z');if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==value)throw new HttpError(400,'تاريخ الميلاد غير صالح');return value;};
 const hmacSecret=()=>process.env.DIWAN_ID_HMAC_KEY||process.env.NEON_AUTH_COOKIE_SECRET;
 const identity=(number,type='national_id')=>{
  try{return fingerprintIdentity(number,type,hmacSecret());}
@@ -120,8 +121,10 @@ async function candidate(db,role,data,tribeId,user,{isMain=false}={}) {
  }
  const familyUnit=isMain?uuid(data.person_family_id):null;
  if(isMain)await getFamily(db,familyUnit,tribeId);
- const r=await db.query("insert into public.people(tribe_id,family_unit_id,given_name_ar,full_name_ar,normalized_name,gender,record_status,visibility,created_by) values($1,$2,$3,$4,$5,$6,'under_review','private',$7) returning id",
-  [tribeId,familyUnit,fullName.split(' ')[0],fullName,canonicalName(fullName),gender,user.id]);
+ const dob=isMain?safeDate(data.person_birth_date):null;
+ const born=isMain?clip(data.person_birth_place,120):null;
+ const r=await db.query("insert into public.people(tribe_id,family_unit_id,given_name_ar,full_name_ar,normalized_name,gender,record_status,visibility,created_by,birth_date,birth_date_precision,birth_place) values($1,$2,$3,$4,$5,$6,'under_review','private',$7,$8,case when $8::date is null then 'unknown' else 'day' end,$9) returning id",
+  [tribeId,familyUnit,fullName.split(' ')[0],fullName,canonicalName(fullName),gender,user.id,dob,born]);
  const id=r.rows[0].id;
  if(hash) await db.query("insert into public.person_identifiers(person_id,country_code,issuer,identifier_type,identifier_hmac,hmac_key_version,masked_value,status) values($1,'SA','admin-supplied',$2,$3,1,$4,'pending')",[id,kind,hash.digest,'******'+hash.last4]);
  return {id,created:true};
@@ -150,6 +153,9 @@ async function changePerson(db,user,form){
  const person=await getPerson(db,personId);
  const name=requiredName(field(form,'full_name'));
  const gender=field(form,'gender',20);
+ const dob=safeDate(form.get('birth_date'));
+ const living=field(form,'living_status',20)||'unknown';
+ if(!['alive','deceased','unknown'].includes(living))throw new HttpError(400,'حالة الحياة غير صالحة');
  const family=uuid(form.get('family_id'));
  if(!['male','female','unknown','undisclosed'].includes(gender))throw new HttpError(400,'الجنس غير صالح');
  await getFamily(db,family,person.tribe_id);
@@ -161,8 +167,8 @@ async function changePerson(db,user,form){
   // Removal or replacement of proven ancestors requires a separate evidence-review workflow.
   throw new HttpError(409,'لا يمكن حذف أو استبدال نسب مسجل مباشرة؛ ارفع طلب مراجعة وتصحيح أولًا');
  }
- await db.query("update public.people set full_name_ar=$2,given_name_ar=$3,normalized_name=$4,gender=$5,family_unit_id=$6,birth_place=$7,biography=$8,record_status='under_review',visibility='private',updated_at=now() where id=$1",
-  [personId,name,name.split(' ')[0],canonicalName(name),gender,family,field(form,'birth_place',120)||null,field(form,'biography',1000)||null]);
+ await db.query("update public.people set full_name_ar=$2,given_name_ar=$3,normalized_name=$4,gender=$5,family_unit_id=$6,birth_place=$7,biography=$8,birth_date=$9,birth_date_precision=case when $9::date is null then 'unknown' else 'day' end,living_status=$10,record_status='under_review',visibility='private',updated_at=now() where id=$1",
+  [personId,name,name.split(' ')[0],canonicalName(name),gender,family,field(form,'birth_place',120)||null,field(form,'biography',1000)||null,dob,living]);
  if(father||mother)await connectParents(db,personId,father,mother);
  await journal(db,user,'genealogy_person_updated','people',personId,{changedFields:['name','gender','family','bio','parents'],needsReview:true});
 }
@@ -330,6 +336,7 @@ export async function genealogyData(user,url){
   "(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) as identity_mask "+
   "from public.people p left join public.lineage_units l on l.id=p.family_unit_id where ($1='' or position(lower($1) in lower(p.full_name_ar))>0) order by p.created_at desc limit 120";
  const focusPersonId=uuid(url.searchParams.get('person_id'));
+ const childOfId=uuid(url.searchParams.get('child_of'));
  const focusUnitId=uuid(url.searchParams.get('unit_id'));
  const [tribes,people,units,sources,stats,directory,directoryUnits,focusPerson,focusUnit]=await Promise.all([
   pool.query('select id,name_ar from public.tribes order by name_ar limit 40'),
@@ -339,9 +346,9 @@ export async function genealogyData(user,url){
   pool.query("select (select count(*) from public.people) people,(select count(*) from public.people where record_status='under_review') drafts,(select count(*) from public.lineage_units) units,(select count(*) from public.lineage_seed_reviews where review_status='needs_review') unit_reviews"),
   pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) identity_mask from public.people p where p.record_status<>'archived' order by p.full_name_ar limit 400"),
   pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units order by name_ar limit 1200'),
-  focusPersonId?pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.birth_place,p.biography from public.people p where p.id=$1 limit 1",[focusPersonId]):Promise.resolve({rows:[]}),
+  focusPersonId?pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.birth_date,p.living_status,p.birth_place,p.biography from public.people p where p.id=$1 limit 1",[focusPersonId]):Promise.resolve({rows:[]}),
   focusUnitId?pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units where id=$1 limit 1',[focusUnitId]):Promise.resolve({rows:[]})
  ]);
  const permissions=await Promise.all(['identity.edit','lineage.structure_apply'].map(key=>authorized(user,key)));
- return {tribes:tribes.rows,people:people.rows,directory:directory.rows,directoryUnits:directoryUnits.rows,units:units.rows,focusedPerson:focusPerson.rows[0]||null,focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
+ return {tribes:tribes.rows,people:people.rows,directory:directory.rows,childOf:directory.rows.find(p=>p.id===childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows,focusedPerson:focusPerson.rows[0]||null,focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
 }
