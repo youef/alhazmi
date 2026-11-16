@@ -1,5 +1,6 @@
 
 import { escapeHtml as esc, page } from './member-views.js';
+import { genealogyView } from './genealogy-admin-views.js';
 const e=x=>esc(x??'');
 const num=x=>new Intl.NumberFormat('ar-SA').format(Number(x||0));
 const date=x=>x?new Intl.DateTimeFormat('ar-SA',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Riyadh'}).format(new Date(x)):'—';
@@ -8,6 +9,7 @@ const ICONS={
  members:'<circle cx="9" cy="8" r="3"/><path d="M2 20v-2a7 7 0 0 1 14 0v2 M17 8a3 3 0 0 1 0 6 M18 16a5 5 0 0 1 4 4"/>',
  requests:'<path d="M7 3h10l4 4v14H7z M17 3v5h5 M10 13h7 M10 17h5"/>',
  services:'<path d="M3 8h18v13H3z M8 8V5a4 4 0 0 1 8 0v3 M3 13h18"/>',
+ genealogy:'<path d="M12 3v4 M4 9h16 M4 9v5 M20 9v5 M2 14h5v7H2z M17 14h5v7h-5z M9 3h6v6H9z"/>',
  kinship:'<path d="M12 3v6 M5 9h14 M5 9v6 M19 9v6 M2 15h6v6H2z M16 15h6v6h-6z M9 3h6v6H9z"/>',
  claims:'<path d="m12 2 9 4v6c0 5-4 8-9 10-5-2-9-5-9-10V6z M9 12l2 2 4-4"/>',
  roles:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2 M20 5v5 M18 8h4"/>',
@@ -15,8 +17,8 @@ const ICONS={
  system:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h10 M7 13h10"/>',
 };
 const icon=(name,size=22)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[name]||ICONS.overview)+'</svg>';
-const names={overview:'نظرة عامة',members:'الأعضاء',kinship:'شجرة عائلتي',requests:'طلبات التغيير',services:'الخدمات',claims:'ربط السجلات',roles:'الأدوار والصلاحيات',supervisors:'مشرفو الأفخاذ والعائلات',audit:'سجل التدقيق',system:'حالة النظام'};
-const navOrder=['overview','kinship','members','requests','services','claims','roles','supervisors','audit','system'];
+const names={overview:'نظرة عامة',genealogy:'إدارة الأنساب والأفراد',members:'الأعضاء',kinship:'شجرة عائلتي',requests:'طلبات التغيير',services:'الخدمات',claims:'ربط السجلات',roles:'الأدوار والصلاحيات',supervisors:'مشرفو الأفخاذ والعائلات',audit:'سجل التدقيق',system:'حالة النظام'};
+const navOrder=['overview','genealogy','kinship','members','requests','services','claims','roles','supervisors','audit','system'];
 const css=`
 .adm-root{--a:#076a45;--b:#075138;--sub:#6a7c72;--bd:#deebe3;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px;align-items:start}
 .adm-side{background:#fff;border:1px solid var(--bd);border-radius:20px;position:sticky;top:108px;padding:14px;box-shadow:0 14px 34px #06452a0a}
@@ -129,7 +131,7 @@ function home(data){
  const metrics='<div class="adm-metrics">'+data.metrics.map((v,i)=>'<a class="adm-metric" href="/admin/'+urls[i]+'"><span class="adm-metric-icon">'+icon(icons[i])+'</span><small>'+metricNames[i]+'</small><strong>'+num(v)+'</strong></a>').join('')+'</div>';
  const recent=table(['النوع','مقدّم الطلب','الحالة','التاريخ'],data.recent.map(r=>tr([e(r.request_type),e(r.email||'غير متاح'),status(r.status),rowTime(r.created_at)])));
  const events=table(['الحدث','المنفّذ','النتيجة','التاريخ'],data.events.map(a=>tr([e(a.event_type),e(a.email||'النظام'),status(a.outcome),rowTime(a.created_at)])));
- return metrics+'<div class="adm-two">'+card('آخر طلبات التغيير',recent,'<a class="adm-link" href="/admin/requests">عرض الكل</a>')+card('آخر أحداث التدقيق',events,'<a class="adm-link" href="/admin/audit">عرض السجل</a>')+'</div>'+card('إجراءات سريعة','<div class="adm-chiprow"><a class="adm-button ghost" href="/admin/members">إدارة الأعضاء</a><a class="adm-button ghost" href="/admin/requests">مراجعة الطلبات</a><a class="adm-button ghost" href="/admin/roles">الأدوار والصلاحيات</a><a class="adm-button ghost" href="/admin/system">مراقبة النظام</a></div>');
+ return metrics+'<div class="adm-two">'+card('آخر طلبات التغيير',recent,'<a class="adm-link" href="/admin/requests">عرض الكل</a>')+card('آخر أحداث التدقيق',events,'<a class="adm-link" href="/admin/audit">عرض السجل</a>')+'</div>'+card('إجراءات سريعة','<div class="adm-chiprow"><a class="adm-button ghost" href="/admin/genealogy">إضافة الأفراد والأفخاذ والعوائل</a><a class="adm-button ghost" href="/admin/members">إدارة الأعضاء</a><a class="adm-button ghost" href="/admin/requests">مراجعة الطلبات</a><a class="adm-button ghost" href="/admin/roles">الأدوار والصلاحيات</a><a class="adm-button ghost" href="/admin/system">مراقبة النظام</a></div>');
 }
 function memberList(data,filter,csrf){
  const rows=data.rows.map(u=>{
@@ -250,6 +252,7 @@ export function adminView(section,user,data,filter,csrf,done=false){
  const hero='<div class="adm-crumbs"><a href="/dashboard">لوحة التحكم</a><span> / </span><a href="/admin">الإدارة</a><span> / </span><strong>'+e(title)+'</strong></div><header class="adm-hero"><span class="adm-eyebrow">DIWAN / MANAGEMENT CONSOLE</span><h1>'+icon(section,27)+' '+e(title)+'</h1><p>'+e(description)+'</p></header>';
  let content='';
  if(section==='overview')content=home(data);
+ else if(section==='genealogy')content=genealogyView(data,csrf);
  else if(section==='kinship')content=kinshipView(data);
  else if(section==='members')content=memberList(data,filter,csrf);
  else if(section==='requests')content=requestList(data,filter,csrf);
