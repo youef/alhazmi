@@ -16,6 +16,7 @@ const requiredName=value=> {
  catch {throw new HttpError(400,'اسم الشخص مطلوب ويجب ألا يقل عن ثلاثة أحرف');}
 };
 const safeDate=raw=>{ const value=clip(raw,10);if(!value)return null;const d=new Date(value+'T00:00:00Z');if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==value)throw new HttpError(400,'تاريخ الميلاد غير صالح');return value;};
+const validateParents=(father,mother,person)=>{try{assertDistinctParents(father,mother,person);}catch{throw new HttpError(409,'لا يجوز ربط شخص بنفسه أو اختيار الشخص نفسه للأب والأم');}};
 const hmacSecret=()=>process.env.DIWAN_ID_HMAC_KEY||process.env.NEON_AUTH_COOKIE_SECRET;
 const identity=(number,type='national_id')=>{
  try{return fingerprintIdentity(number,type,hmacSecret());}
@@ -60,7 +61,7 @@ async function checkCycle(db,child,parent) {
  if(r.rowCount)throw new HttpError(409,'هذا الربط ينشئ دورة غير صحيحة في شجرة النسب');
 }
 async function connectParents(db,personId,fatherId,motherId,{newRecord=false}={}) {
- assertDistinctParents(fatherId,motherId,personId);
+ validateParents(fatherId,motherId,personId);
  const person=await getPerson(db,personId);
  for (const [role,id] of [['father',fatherId],['mother',motherId]]) {
   if(!id)continue;
@@ -134,7 +135,8 @@ async function createFamilyTree(db,user,form) {
  await tribeExists(db,tribeId);
  const data=Object.fromEntries([...form.entries()].filter(([k])=>k!=='csrf'&&k!=='operation').map(([k,v])=>[k,clip(v,250)]));
  data.person_name=requiredName(data.person_name);
- const plan=relativePlan(data);
+ let plan;
+ try {plan=relativePlan(data);}catch {throw new HttpError(400,'لا يمكن إضافة الجد أو الجدة قبل تحديد الأب أو الأم في القسم السابق');}
  const ids={};
  const creations=[];
  for(const role of [...plan,'person']){
@@ -160,7 +162,7 @@ async function changePerson(db,user,form){
  if(!['male','female','unknown','undisclosed'].includes(gender))throw new HttpError(400,'الجنس غير صالح');
  await getFamily(db,family,person.tribe_id);
  const father=uuid(form.get('father_id')),mother=uuid(form.get('mother_id'));
- assertDistinctParents(father,mother,personId);
+ validateParents(father,mother,personId);
  if(father)await checkCycle(db,personId,father);
  if(mother)await checkCycle(db,personId,mother);
  if((person.father_id && person.father_id!==father)||(person.mother_id && person.mother_id!==mother)){
