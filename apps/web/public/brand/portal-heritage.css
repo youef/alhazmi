@@ -59,3 +59,76 @@ body :is(a,button,input,select,textarea,summary):focus-visible{outline:3px solid
  body .adm-nav a,body .adm-card,body .adm-metric,body .tile,body button,body .action-link,body .adm-button{transition:none!important}
  body button:hover,body .action-link:hover,body .adm-button:hover{transform:none!important}
 }
+
+/* Dashboard refinement v2. All existing photographic and emblem assets remain unchanged. */
+body{background:radial-gradient(ellipse 90% 24% at 50% 0,#e9d9c644,transparent),var(--canvas)}
+body main{max-width:1460px}
+body .overview{gap:15px}
+body .overview .card{border-top:3px solid #c69e70}
+body .overview .value{font-variant-numeric:tabular-nums;color:#805039}
+body .grid{gap:16px}
+body .tile{position:relative;min-height:165px;padding:20px;overflow:hidden}
+body .tile:before{content:"";position:absolute;inset-inline-start:0;inset-block:22px auto;width:3px;height:38px;background:#c79d6e;border-radius:8px}
+body .tile-icon{color:#955237;background:#f6e8d8;border:1px solid #e0c7a8;display:grid;place-items:center}
+body .tile strong{color:#3f2c20;font-size:1rem;line-height:1.6}
+body .tile p{color:#806c5d;font-size:.84rem;line-height:1.8}
+body .tile:hover{transform:translateY(-3px);border-color:#c79d6e;box-shadow:0 14px 34px #4b2a151b}
+body .section-heading{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid #e4d3c1;padding-bottom:12px;margin-top:30px}
+body .section-heading h2{color:#3c291e}
+body .section-heading small{color:#8b7462}
+body .page-tools{gap:12px}
+body .search-field{box-shadow:0 4px 18px #49301c0a}
+body .search-field:focus-within{box-shadow:0 0 0 3px #c59b6d38;border-color:#bd8d60}
+body .search-field svg{color:#985238}
+body .adm-side{border:1px solid #6e5038}
+body .adm-side-title{color:#f1cc97;font-size:1rem}
+body .adm-nav a{min-height:47px}
+body .adm-nav a svg{flex:none}
+body .adm-hero{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px}
+body .adm-hero h1{display:flex;align-items:center;gap:12px}
+body .adm-hero h1 svg{flex:none}
+body .adm-eyebrow{color:#e8c390;letter-spacing:.08em}
+body .adm-crumbs{margin-bottom:16px}
+body .adm-metrics{gap:15px}
+body .adm-metric{min-height:150px;justify-content:center;position:relative;overflow:hidden}
+body .adm-metric:after{content:"";height:3px;position:absolute;inset-block-start:0;inset-inline:0;background:linear-gradient(90deg,#9c5638,#d6ad7e)}
+body .adm-metric strong{font-variant-numeric:tabular-nums}
+body .adm-metric-icon{border-radius:13px}
+body .adm-card h2{font-weight:850}
+body .adm-kv{gap:14px}
+body .adm-form input,body .adm-form select,body .adm-form textarea{width:100%}
+body .adm-family-links{gap:7px}
+body .adm-person strong{overflow-wrap:anywhere}
+body .adm-person{box-shadow:0 5px 18px #4628110c}
+body .adm-badge.good{background:#e8f4e9;color:#28613e}
+body .adm-badge.warn{background:#fff0d5;color:#7e530f}
+body .adm-badge.bad{background:#ffe9e6;color:#963b32}
+body .adm-notice{background:#f1e5d8;color:#70442b;border:1px solid #dec7ab}
+body .adm-link{color:#985237}
+body .adm-button,body .action-link{font-weight:750}
+body .adm-button:not(.ghost):not(.danger){background:#a55339}
+body .adm-button:not(.ghost):not(.danger):hover{background:#86412d}
+@media(max-width:900px){
+ body .adm-side{border-radius:15px}
+ body .adm-nav a{padding:9px 12px!important}
+ body .adm-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:650px){
+ body main{padding-inline:14px}
+ body .overview{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ body .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ body .tile{min-height:155px;padding:14px}
+ body .tile:before{inset-block-start:16px;height:25px}
+ body .tile strong{font-size:.9rem}
+ body .tile p{font-size:.78rem}
+ body .adm-hero h1{font-size:clamp(1.35rem,5vw,1.8rem)}
+ body .adm-metrics{gap:10px}
+ body .adm-metric{min-height:130px}
+ body .adm-table{font-size:.79rem}
+ body .adm-table th,body .adm-table td{padding:10px 9px}
+}
+@media(max-width:380px){
+ body .grid,body .overview,body .adm-metrics{grid-template-columns:1fr}
+ body .tile{min-height:120px}
+}
+@media(prefers-reduced-motion:reduce){body .tile:hover{transform:none}}
