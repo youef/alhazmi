@@ -97,6 +97,32 @@ export const genealogyStyles=`
 .gen-create-extras textarea{width:100%;resize:vertical}
 .gen-editor .gen-edit-fieldset:nth-of-type(3){border-color:#d5dcba}
 .gen-shell :is(a,button,summary,input,select,textarea):focus-visible{outline:3px solid #a96545;outline-offset:2px}
+
+.gen-relation-panel{display:grid;gap:13px;padding:clamp(14px,2.5vw,21px);border:1px solid #dec3a1;border-radius:17px;background:linear-gradient(135deg,#fcf4e8,#fffefa);margin-bottom:16px}
+.gen-relation-panel .gen-section-head{margin-bottom:3px}
+.gen-relation-panel h3{color:#58331e;font-size:1.06rem;margin:0}
+.gen-rel-tabs{display:grid;gap:10px;min-width:0}
+.gen-rel-tabs>h3{font-size:.96rem;border-bottom:1px solid #e4d3c0;padding-bottom:8px}
+.gen-rel-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr))}
+.gen-rel-group{display:grid;align-content:start;gap:9px;min-width:0}
+.gen-rel-group h4{color:#84522e;font-size:.84rem;margin:0}
+.gen-relation-person{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px;border:1px solid #e9dbcc;border-radius:12px;background:#fff;padding:13px;min-width:0;box-shadow:0 5px 14px #65411d0b}
+.gen-relation-person>div{display:grid;gap:3px;min-width:0;flex:1 1 170px}
+.gen-relation-person strong{font-size:.87rem;color:#3b2c21;overflow-wrap:anywhere}
+.gen-relation-person small{font-size:.74rem;color:#796655}
+.gen-relation-person .gen-compact-button{min-height:36px;font-size:.73rem;padding:6px 10px}
+.gen-rel-unknown{display:block;padding:13px;color:#967762;border:1px dashed #dbcab6;border-radius:11px;background:#fffaf2}
+.gen-rel-ancestors{background:#f9efe1}
+.gen-relation-add{border-color:#d7ad82;background:#fffdfa}
+.gen-relation-add>summary{font-size:.9rem}
+.gen-relation-add>.gen-form{margin-top:12px;gap:12px}
+.gen-relation-add .gen-form-grid .gen-full{grid-column:1/-1}
+.gen-relation-add .gen-form-grid label{min-width:0}
+.gen-relation-add .gen-form-grid textarea{width:100%;resize:vertical}
+.gen-relation-add .gen-form-grid .gen-check{font-size:.8rem;align-items:flex-start}
+.gen-relation-add .gen-details{background:#fff8ef}
+.gen-relation-add .gen-submit{width:100%;min-height:49px}
+@media(max-width:620px){.gen-rel-grid{grid-template-columns:1fr}.gen-relation-panel{padding:12px}.gen-relation-person{align-items:flex-start}.gen-relation-person .gen-compact-button{width:100%}}
 @media(max-width:1000px){.gen-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){
  .gen-grid,.gen-form-grid,.gen-relative,.gen-identity-row{grid-template-columns:1fr}
