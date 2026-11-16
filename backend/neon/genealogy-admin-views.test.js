@@ -24,3 +24,32 @@ test('genealogy editor renders full private fields and keeps existing parents se
  assert.ok(html.includes('creationExtras')===false);
  assert.ok(html.includes('تفاصيل الفرد الخاصة'));
 });
+
+test('focused genealogy displays ancestry when no marriage has been recorded',()=>{
+ const p={id:'00000000-0000-0000-0000-000000000001',full_name_ar:'ابن تجريبي',gender:'male',record_status:'under_review',father_id:'00000000-0000-0000-0000-000000000002',mother_id:'00000000-0000-0000-0000-000000000003'};
+ const father={id:p.father_id,full_name_ar:'الأب',gender:'male',father_id:'00000000-0000-0000-0000-000000000004',family_name:'عائلة تجريبية',record_status:'under_review'};
+ const mother={id:p.mother_id,full_name_ar:'الأم',gender:'female',record_status:'under_review'};
+ const grand={id:father.father_id,full_name_ar:'الجد',gender:'male',record_status:'under_review'};
+ const data={focusedPerson:p,focusedUnit:null,relations:{ancestors:[father,mother,grand],spouses:[],children:[]},canEditPeople:true,canEditUnits:false,
+  people:[p],directory:[p,father,mother,grand],directoryUnits:[],units:[],tribes:[],sources:[],stats:{people:4,drafts:4,units:0,unit_reviews:0},q:'',unitQ:'',childOf:null};
+ const html=genealogyView(data,'csrf-token-test');
+ assert.ok(html.includes('لا توجد زيجات مسجلة'));
+ assert.ok(html.includes('الجد من الأم')===false || html.includes('أجداد الأم'));
+ for(const field of ['relative_id','relative_name','relative_identity','relative_family_id','relation_role','confirm_reuse'])
+  assert.ok(html.includes('name="'+field+'"'),field);
+ assert.ok(html.includes('إضافة زوج / ابن / أب / أم / جد'));
+ assert.ok(html.includes('الأب')&&html.includes('الأم')&&html.includes('الجد'));
+});
+test('focused genealogy shows spouses and children with edit links and reported statuses',()=>{
+ const p={id:'00000000-0000-0000-0000-000000000001',full_name_ar:'شخص',gender:'male',record_status:'under_review'};
+ const wife={id:'00000000-0000-0000-0000-000000000002',full_name_ar:'زوجة تجريبية',marriage_status:'reported',record_status:'under_review'};
+ const child={id:'00000000-0000-0000-0000-000000000003',full_name_ar:'ابن تجريبي',gender:'male',record_status:'under_review'};
+ const data={focusedPerson:p,relations:{spouses:[wife],children:[child],ancestors:[]},focusedUnit:null,
+ canEditPeople:true,canEditUnits:false,people:[p],directory:[],directoryUnits:[],units:[],tribes:[],sources:[],stats:{people:3,drafts:3,units:0,unit_reviews:0},q:'',unitQ:'',childOf:null};
+ const html=genealogyView(data,'csrf-token-test');
+ assert.ok(html.includes('زوجة تجريبية'));
+ assert.ok(html.includes('ابن تجريبي'));
+ assert.ok(html.includes('زواج مُبلّغ عنه'));
+ assert.ok(html.includes(encodeURIComponent(wife.id)+'#gen-person-edit'));
+ assert.ok(html.includes(encodeURIComponent(child.id)+'#gen-person-edit'));
+});
