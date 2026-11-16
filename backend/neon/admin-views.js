@@ -81,6 +81,22 @@ const css=`
 @media(max-width:900px){.adm-root{grid-template-columns:1fr}.adm-side{position:static;padding:10px}.adm-side-title{padding:8px 10px;margin-bottom:6px}.adm-nav{display:flex!important;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:thin}.adm-nav a{white-space:nowrap;flex:0 0 auto}.adm-two{grid-template-columns:1fr}}
 @media(max-width:450px){.adm-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.adm-metric{padding:12px}.adm-metric strong{font-size:1.3rem}.adm-hero{padding:22px}}
 @media(prefers-reduced-motion:reduce){.adm-root *{scroll-behavior:auto}}
+
+
+/* Admin operations: warm editorial shell */
+.adm-root{--a:#a55339;--b:#38291d;--sub:#8a7564;--bd:#e6dacb;grid-template-columns:260px minmax(0,1fr);gap:18px}
+.adm-side{background:#30251c;color:#f7ebdd;border:1px solid #4c392d;border-radius:18px;top:90px;box-shadow:0 15px 40px #2c1c1730}
+.adm-side-title{color:#e3b987;border-bottom:1px solid #68503b}
+.adm-nav a{color:#eddbc8!important;border-radius:10px}.adm-nav a svg{color:#c49971}
+.adm-nav a[aria-current=page],.adm-nav a:hover{background:#a55339!important;color:#fff!important}
+.adm-nav a[aria-current=page] svg,.adm-nav a:hover svg{color:#fff}
+.adm-hero{background:linear-gradient(105deg,#2e231c,#62402c 62%,#a55c3c);min-height:220px;border:1px solid #ae8059;border-radius:22px}
+.adm-hero:after{border-color:#e8c49b42;box-shadow:0 0 0 42px #d8ae7d13,0 0 0 88px #ead1a911}
+.adm-eyebrow{color:#e3bc86}.adm-hero p{color:#f3ddc5}
+.adm-metric,.adm-card{background:#fffdfa;border-color:#e6dacb;border-radius:18px;box-shadow:0 9px 28px #4c301b12}
+.adm-metric-icon{background:#f4e5d6;color:#a55339}.adm-metric strong{color:#38291d}
+.adm-table th{background:#f6ede3;color:#705948}.adm-link,.adm-crumbs a{color:#a55339}
+@media(max-width:850px){.adm-root{grid-template-columns:minmax(0,1fr)}.adm-side{position:static}.adm-nav{display:flex!important;flex-wrap:nowrap!important;overflow:auto;gap:6px!important}.adm-nav a{white-space:nowrap}}
 `;
 const statusLabels={active:'نشط',pending:'بانتظار التفعيل',suspended:'موقوف',submitted:'مقدّم',triage:'فرز',needs_evidence:'يتطلب مستندات',approved:'معتمد',rejected:'مرفوض',draft:'مسودة',retired:'مؤرشف',review:'قيد المراجعة',in_review:'قيد المراجعة',completed:'مكتمل',cancelled:'ملغى'};
 const status=v=>{
