@@ -322,6 +322,8 @@ async function addPersonRelation(db,user,form){
  }else{
   const name=requiredName(fullName);
   const gender=relationGender(role,field(form,'relative_gender',20));
+  const livingStatus=field(form,'relative_living_status',20)||'unknown';
+  if(!['alive','deceased','unknown'].includes(livingStatus))throw new HttpError(400,'حالة الحياة غير صالحة');
   const duplicate=await db.query("select id from public.people where tribe_id=$1 and normalized_name=$2 and record_status<>'archived' limit 1",[person.tribe_id,canonicalName(name)]);
   if(duplicate.rowCount)throw new HttpError(409,'اسم مطابق موجود سابقًا؛ ابحث عنه وحدده أو أدخل رقم الهوية لتفادي التكرار');
   const explicitFamily=uuid(form.get('relative_family_id'));
@@ -329,7 +331,7 @@ async function addPersonRelation(db,user,form){
   const family=explicitFamily||sameLineageFamily(person,role,parent);
   const born=safeDate(form.get('relative_birth_date'));
   const inserted=await db.query("insert into public.people(tribe_id,family_unit_id,given_name_ar,full_name_ar,normalized_name,gender,birth_date,birth_date_precision,birth_place,living_status,record_status,visibility,created_by) values($1,$2,$3,$4,$5,$6,$7,case when $7::date is null then 'unknown' else 'day' end,$8,$9,'under_review','private',$10) returning id",
-   [person.tribe_id,family,name.split(' ')[0],name,canonicalName(name),gender,born,field(form,'relative_birth_place',120)||null,field(form,'relative_living_status',20)||'unknown',user.id]);
+   [person.tribe_id,family,name.split(' ')[0],name,canonicalName(name),gender,born,field(form,'relative_birth_place',120)||null,livingStatus,user.id]);
   relative={id:inserted.rows[0].id,tribe_id:person.tribe_id,gender,full_name_ar:name,father_id:null,mother_id:null,record_status:'under_review',family_unit_id:family};
   created=true;
   const details=new URLSearchParams();
@@ -349,7 +351,18 @@ async function addPersonRelation(db,user,form){
   if(current.rowCount)throw new HttpError(409,'توجد علاقة زواج مسجلة بين الشخصين بالفعل؛ راجعها بدل إضافتها مرة أخرى');
   await db.query("insert into public.marriages(partner_a_id,partner_b_id,start_date,status,notes) values($1,$2,$3,'reported',$4)",[person.id,relative.id,safeDate(form.get('marriage_start_date')),'إضافة إدارية تنتظر التوثيق']);
  }else if(role==='child'){
-  await connectParents(db,relative.id,person.gender==='male'?person.id:null,person.gender==='female'?person.id:null,{newRecord:created});
+  const otherId=uuid(form.get('co_parent_id'));
+  let other=null;
+  if(otherId){
+   const linked=await db.query("select 1 from public.marriages where ((partner_a_id=$1 and partner_b_id=$2) or (partner_a_id=$2 and partner_b_id=$1)) and status in ('reported','current') limit 1",[person.id,otherId]);
+   if(!linked.rowCount)throw new HttpError(409,'الطرف الآخر غير مسجل كزوج أو زوجة في علاقة قائمة أو مُبلّغ عنها');
+   other=await getPerson(db,otherId);
+   if(other.gender===(person.gender==='male'?'male':'female')||!['male','female'].includes(other.gender))
+    throw new HttpError(409,'جنس الطرف الآخر لا يتوافق مع دور الأب أو الأم؛ تحقق من بيانات الزوجين');
+  }
+  const father=person.gender==='male'?person.id:(other?.id||null);
+  const mother=person.gender==='female'?person.id:(other?.id||null);
+  await connectParents(db,relative.id,father,mother,{newRecord:created});
  }else{
   await connectParents(db,parent.id,spec.slot==='father'?relative.id:null,spec.slot==='mother'?relative.id:null,{newRecord:false});
  }
