@@ -99,6 +99,46 @@ const css=`
 .adm-metric-icon{background:#f4e5d6;color:#a55339}.adm-metric strong{color:#38291d}
 .adm-table th{background:#f6ede3;color:#705948}.adm-link,.adm-crumbs a{color:#a55339}
 @media(max-width:850px){.adm-root{grid-template-columns:minmax(0,1fr)}.adm-side{position:static}.adm-nav{display:flex!important;flex-wrap:nowrap!important;overflow:auto;gap:6px!important}.adm-nav a{white-space:nowrap}}
+
+/* Consistent Diwan administration layout across all management pages */
+.adm-main{min-width:0;display:block}
+.adm-main>.adm-crumbs{margin-block:3px 12px}
+.adm-main>.adm-card,.adm-main>.gen-shell{max-width:100%}
+.adm-side{overflow:hidden}
+.adm-side-title{font-size:1rem;letter-spacing:.01em}
+.adm-nav a{position:relative;transition:background .15s ease,color .15s ease;min-height:48px}
+.adm-nav a[aria-current=page]:before{content:"";position:absolute;inset-block:12px;inset-inline-start:0;width:3px;border-radius:6px;background:#f6d0a1}
+.adm-hero{display:flex;flex-direction:column;justify-content:center;min-height:175px}
+.adm-hero h1{display:flex;align-items:center;gap:11px;flex-wrap:wrap;line-height:1.3}
+.adm-metrics{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
+.adm-metric{transition:transform .15s ease,box-shadow .15s ease}
+.adm-metric:hover{transform:translateY(-2px);box-shadow:0 13px 30px #4c301b1c}
+.adm-card,.adm-metric,.adm-detail{overflow-wrap:anywhere}
+.adm-card{scroll-margin-top:20px}
+.adm-tools{padding:13px 14px;border-radius:13px;background:#f7f0e7;border:1px solid #eadac6}
+.adm-tools label{flex:1 1 220px;min-width:0}
+.adm-tools :is(input,select){width:100%;min-width:0}
+.adm-form :is(input,textarea,select){background:#fffdfa;border-color:#d8c4b0;color:#3d2a20;transition:border-color .14s}
+.adm-form textarea{min-height:100px;resize:vertical}
+.adm-form :is(input,textarea,select):focus,.adm-tools :is(input,select):focus{outline:2px solid #af764e;outline-offset:1px}
+.adm-button{background:#9d5837;min-height:45px;padding-inline:17px}
+.adm-button:hover{background:#7e3e26}
+.adm-detail{background:#fff9f2;border-color:#e8d7c4}
+.adm-detail summary{color:#8f4b2e}
+.adm-note{background:#fff8ec;border-color:#ead8c1;color:#725844}
+.adm-table-wrap{border:1px solid #ecdfd0;border-radius:14px}
+.adm-table th{position:sticky;top:0;background:#f7eee4;z-index:1}
+.adm-table tbody tr:nth-child(2n){background:#fdf9f4}
+.adm-table tbody tr:hover{background:#f7ecde}
+.adm-pagination a{color:#8e502e}
+.adm-badge.good{background:#e9f4e8;color:#317044}
+.adm-badge.warn{background:#fff0d5;color:#9a692c}
+.adm-badge.bad{background:#fae7e2;color:#a34d37}
+.adm-root :is(a,button,summary,input,select,textarea):focus-visible{outline:3px solid #bf8855;outline-offset:2px}
+@media(max-width:850px){.adm-main>.adm-crumbs{padding-inline:3px}.adm-side{border-radius:14px}.adm-nav{scroll-snap-type:x proximity}.adm-nav a{scroll-snap-align:center}.adm-hero{min-height:145px}.adm-hero h1{font-size:1.4rem}}
+@media(max-width:500px){.adm-card{padding:14px}.adm-tools{padding:11px}.adm-metric{min-height:110px}.adm-table{font-size:.78rem}.adm-table th,.adm-table td{padding:10px 8px}}
+@media(prefers-reduced-motion:reduce){.adm-metric{transition:none}.adm-metric:hover{transform:none}}
+
 `;
 const statusLabels={active:'نشط',pending:'بانتظار التفعيل',suspended:'موقوف',submitted:'مقدّم',triage:'فرز',needs_evidence:'يتطلب مستندات',approved:'معتمد',rejected:'مرفوض',draft:'مسودة',retired:'مؤرشف',review:'قيد المراجعة',in_review:'قيد المراجعة',completed:'مكتمل',cancelled:'ملغى'};
 const status=v=>{
