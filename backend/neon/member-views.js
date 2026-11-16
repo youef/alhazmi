@@ -94,6 +94,23 @@ h1,h2,h3{letter-spacing:-.02em}
 @media(max-width:650px){nav{gap:2px 5px}nav .brand{width:100%;margin-bottom:5px}nav a:not(.brand){font-size:.8rem;padding-inline:8px}nav form button{font-size:.8rem}.member-hero{padding:24px}.overview .value{font-size:1.2rem}main{padding-inline:14px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.tile{padding:13px;min-height:140px}.tile strong{font-size:.88rem}.tile-icon{width:40px;height:40px}.tile-icon svg{width:21px;height:21px}}
 @media(max-width:360px){.grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.tile,.action-link{transition:none}.tile:hover,.action-link:hover{transform:none}}
+
+
+/* Warm heritage design shared with the public diwan */
+:root{color-scheme:light;--surface:#fffdfa;--canvas:#f5f1eb;--text:#38291f;--muted:#8b7667;--line:#e6dbcc;--accent:#a55339;--soft:#f5e8db;--header:#30251c;--gold:#c2965d}
+body{background:var(--canvas);color:var(--text)}
+header{background:#30251c;color:#fff4e5;border-bottom:3px solid #b77c51}
+header:before{background:linear-gradient(90deg,#a55339,#e5bb86,#a55339)}
+header nav a,header nav .brand{color:#fff1dd}
+main{max-width:1450px}.hero,.card,.auth-card,.tile{background:var(--surface);border-color:var(--line);border-radius:18px;box-shadow:0 10px 30px #44281811}
+.member-hero{background:linear-gradient(115deg,#2d211b 10%,#603c29 60%,#a15a3b);border:1px solid #ae754e;border-radius:21px;min-height:210px;position:relative;overflow:hidden}
+.member-hero:after{content:"";position:absolute;inset:auto 0 0;height:30px;background:linear-gradient(120deg,#9e5834 20%,#d0a275 50%,#4d3325 80%);clip-path:polygon(0 100%,0 60%,20% 90%,46% 0,67% 85%,85% 30%,100% 95%,100% 100%);opacity:.65;pointer-events:none}
+.member-hero p{color:#ead7c3}
+button,.action-link{background:#a55339;border-radius:10px;color:white}button:hover,.action-link:hover{background:#8b412d}
+.action-link.secondary{background:#f2e0d0;color:#87412d}.member-hero .action-link{background:#e4bf8d;color:#352316}
+input,select,textarea{background:#fffefa;color:var(--text);border:1px solid var(--line);border-radius:10px}
+input:focus,select:focus,textarea:focus{outline:2px solid #c78d5f;outline-offset:1px}
+.tile-icon,.overview .value{color:#a55339}.tile-icon{background:#f5e6d6}.alert{background:#f5e6d6}
 `;
 
 export function escapeHtml(value) {
