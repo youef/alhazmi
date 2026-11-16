@@ -69,31 +69,86 @@ function personRows(data){
     '<td><div class="gen-action-group"><a class="gen-compact-button" href="'+e(url)+'">تعديل</a>'+'<a class="gen-compact-button" href="/admin/genealogy?child_of='+encodeURIComponent(p.id)+'#gen-tree-create">إضافة ابن/ابنة</a></div></td></tr>';
  }).join('')+'</tbody></table></div>';
 }
+const dateValue=value=>{
+ if(!value)return '';
+ const date=new Date(value);
+ return Number.isNaN(date.getTime())?'':date.toISOString().slice(0,10);
+};
+const input=(name,title,value='',max=160,type='text',other='')=>
+ '<label>'+e(title)+'<input name="'+e(name)+'" type="'+e(type)+'" maxlength="'+max+'" value="'+e(value??'')+'" '+other+'></label>';
+const wide=(html)=>'<div class="gen-full">'+html+'</div>';
 function editPersonCard(data,csrf){
  const p=data.focusedPerson;
  if(!p||!data.canEditPeople)return '';
- const edit=form('edit_person',csrf,h('id',p.id)+'<div class="gen-form-grid">'+
-  '<label>الاسم الكامل<input name="full_name" required maxlength="200" value="'+e(p.full_name_ar)+'"></label>'+
+ const ad=p.private_address||{};
+ const selected=(v,current)=>v===current?' selected':'';
+ const addressRows=[
+   input('address_short_code','العنوان المختصر',ad.short_code,12,'text','placeholder="مثال: RRRD1234"'),
+   input('address_building_number','رقم المبنى',ad.building_number,8,'text','inputmode="numeric" placeholder="٤ أرقام"'),
+   input('address_street','الشارع',ad.street,160),
+   input('address_district','الحي',ad.district,130),
+   input('address_postal_code','الرمز البريدي',ad.postal_code,10,'text','inputmode="numeric" placeholder="٥ أرقام"'),
+   input('address_additional_number','الرقم الإضافي',ad.additional_number,10,'text','inputmode="numeric" placeholder="٤ أرقام"'),
+   input('address_unit_number','رقم الوحدة',ad.unit_number,20),
+   wide('<label>وصف تفصيلي للعنوان<textarea name="address_address_details" maxlength="750" rows="3">'+e(ad.address_details||'')+'</textarea></label>')
+ ].join('');
+ const employment=[
+  ['','— غير محددة —'],['employed','موظف'],['self_employed','عمل حر'],['unemployed','غير موظف'],['student','طالب'],['retired','متقاعد'],['unknown','غير معروف']
+ ].map(([v,l])=>'<option value="'+v+'"'+selected(v,p.employment_status||'')+'>'+l+'</option>').join('');
+ const editor=h('id',p.id)+
+  '<fieldset class="gen-edit-fieldset"><legend>01 · البيانات الأساسية والنسب</legend><div class="gen-form-grid">'+
+  wide(input('full_name','الاسم الكامل',p.full_name_ar,200,'text','required'))+
   '<label>الجنس'+genderSelect(p.gender)+'</label>'+
-  '<label>العائلة'+familySelect(data,p.family_unit_id,'family_id')+'</label>'+
-  '<label>مكان الميلاد<input name="birth_place" maxlength="120" value="'+e(p.birth_place||'')+'"></label>'+  '<label>تاريخ الميلاد<input name="birth_date" type="date" value="'+e(p.birth_date?String(p.birth_date).slice(0,10):'')+'"></label>'+  '<label>حالة الحياة<select name="living_status"><option value="unknown"'+(p.living_status==='unknown'?' selected':'')+'>غير معروفة</option><option value="alive"'+(p.living_status==='alive'?' selected':'')+'>حي</option><option value="deceased"'+(p.living_status==='deceased'?' selected':'')+'>متوفى</option></select></label>'+
+  '<label>العائلة / البيت'+familySelect(data,p.family_unit_id,'family_id')+'</label>'+
   '<label>الأب'+selectParents(data,'father',p.father_id)+'</label>'+
-  '<label>الأم'+selectParents(data,'mother',p.mother_id)+'</label></div>'+
-  '<label>نبذة محفوظة داخليًا<textarea name="biography" maxlength="1000">'+e(p.biography||'')+'</textarea></label>'+
-  '<p class="gen-muted">حفظ التعديل يعيد السجل للمراجعة. لا يمكن إزالة أب أو أم مسجلين من دون طلب تصحيح مستقل.</p>',
-  'حفظ التعديل');
+  '<label>الأم'+selectParents(data,'mother',p.mother_id)+'</label>'+
+  '</div><p class="gen-muted">يمكن إضافة أب أو أم غير مسجلين. تغيير الوالدين المرتبطين مسبقًا يتم عبر طلب تصحيح موثق لحماية تسلسل الأنساب.</p></fieldset>'+
+  '<fieldset class="gen-edit-fieldset"><legend>02 · الميلاد والحالة والنبذة</legend><div class="gen-form-grid">'+
+  input('birth_place','مكان الميلاد',p.birth_place,120)+
+  '<label>تاريخ الميلاد<input name="birth_date" type="date" value="'+e(dateValue(p.birth_date))+'"></label>'+
+  '<label>حالة الحياة<select name="living_status"><option value="unknown"'+selected('unknown',p.living_status)+'>غير معروفة</option><option value="alive"'+selected('alive',p.living_status)+'>حي</option><option value="deceased"'+selected('deceased',p.living_status)+'>متوفى</option></select></label>'+
+  '<label>تاريخ الوفاة (إن وجد)<input type="date" name="death_date" value="'+e(dateValue(p.death_date))+'"></label>'+
+  wide('<label>نبذة تعريفية (تخضع للمراجعة قبل إتاحتها)<textarea name="biography" maxlength="4000" rows="4">'+e(p.biography||'')+'</textarea></label>')+
+  '</div></fieldset>'+
+  '<fieldset class="gen-edit-fieldset"><legend>03 · الهوية والوثائق الحساسة</legend><div class="gen-form-grid">'+
+  wide('<p class="gen-sensitive">الهوية المسجلة: <strong dir="ltr">'+e(p.national_id_last4?'••••••'+p.national_id_last4:'غير موجودة في الملف الخاص')+'</strong>. لن يظهر الرقم الكامل بعد الحفظ، ويمكن استبدال الهوية غير المعتمدة برقم صحيح.</p>')+
+  '<label>نوع الوثيقة'+idKind()+'</label>'+
+  input('identity','تسجيل أو استبدال رقم الهوية','',50,'password','autocomplete="new-password" inputmode="numeric" placeholder="اتركه فارغًا للمحافظة على الحالي"')+
+  wide('<label class="gen-check"><input type="checkbox" name="remove_identity" value="yes">إلغاء الهوية غير المعتمدة وحذف نسختها المشفّرة من الملف (اترك الرقم الجديد فارغًا)</label>')+
+  '</div></fieldset>'+
+  '<fieldset class="gen-edit-fieldset"><legend>04 · العنوان الوطني والسكن</legend><div class="gen-form-grid">'+
+  input('city','المدينة',p.city,100)+input('region','المنطقة',p.region,100)+
+  input('country','رمز الدولة',p.country||'SA',2,'text','placeholder="SA"')+
+  addressRows+'</div><p class="gen-muted">تفاصيل المبنى والشارع والحي والرمز البريدي والعنوان المختصر مشفّرة في قاعدة البيانات.</p></fieldset>'+
+  '<fieldset class="gen-edit-fieldset"><legend>05 · التواصل والعمل والتعليم</legend><div class="gen-form-grid">'+
+  input('phone','رقم الجوال',p.phone,32,'tel','autocomplete="off"')+
+  input('email','البريد الإلكتروني',p.email,254,'email','autocomplete="off"')+
+  '<label>الحالة الوظيفية<select name="employment_status">'+employment+'</select></label>'+
+  input('education_level','المؤهل العلمي',p.education_level,120)+
+  input('employer','جهة العمل',p.employer,200)+
+  input('job_title','المسمى الوظيفي',p.job_title,160)+
+  '</div></fieldset>'+
+  '<fieldset class="gen-edit-fieldset"><legend>06 · التفاصيل الطويلة الخاصة</legend>'+
+  '<p class="gen-muted">ملاحظات لا تُعرض للزوار أو في الشجرة العامة؛ محمية بالتشفير وصلاحيات الإدارة.</p>'+
+  '<label>الملاحظات الداخلية الكاملة<textarea name="private_notes" maxlength="5000" rows="7" placeholder="توثيق خاص، بيانات إضافية، تواريخ وتفاصيل تحتاج الحفظ...">'+e(p.private_notes||'')+'</textarea></label>'+
+  '</fieldset><p class="gen-muted">حفظ التعديل يعيد السجل للمراجعة، ويحفظ المحتوى الخاص منفصلًا عن النبذة العامة.</p>';
+ const edit=form('edit_person',csrf,editor,'حفظ جميع بيانات الفرد');
  const archive=form(p.record_status==='archived'?'restore_person':'archive_person',csrf,h('id',p.id)+
   '<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>أؤكد '+(p.record_status==='archived'?'استعادة':'أرشفة')+' سجل الفرد</label>',
   p.record_status==='archived'?'استعادة للمراجعة':'أرشفة السجل');
  const remove=form('delete_person_draft',csrf,h('id',p.id)+
-  '<p class="gen-muted">الحذف متاح فقط للمسودات الخاصة غير المرتبطة بالأبناء أو حسابات أعضاء.</p>'+
-  '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>أؤكد حذف المسودة غير المرتبطة نهائيًا</label>',
+  '<p class="gen-muted">الحذف الدائم مقيد بالمسودات غير المرتبطة بأبناء أو زوجات أو عضويات أو اعتماد رسمي.</p>'+
+  '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>أؤكد حذف المسودة غير المرتبطة</label>',
   'حذف المسودة');
- return '<section class="gen-section" id="gen-person-edit"><div class="gen-section-head"><div><h2>تعديل سجل: '+e(p.full_name_ar)+'</h2>'+
-   '<small>محرر فرد واحد لمنع بطء الصفحة — جميع الحقول خاصة</small></div><a href="/admin/genealogy" class="gen-compact-button">إغلاق المحرر</a></div>'+
-   '<div class="gen-form-grid"><div>'+edit+'</div><div class="gen-bundle">'+
-   '<details class="gen-details"><summary>أرشفة / استعادة السجل</summary>'+archive+'</details>'+
-   '<details class="gen-details"><summary>حذف المسودة (عند عدم الارتباط فقط)</summary>'+remove+'</details></div></div></section>';
+ return '<section class="gen-section gen-editor" id="gen-person-edit">'+
+  '<div class="gen-section-head"><div><span class="gen-editor-eyebrow">السجل الشخصي · تفاصيل الإدارة</span><h2>تعديل سجل: '+e(p.full_name_ar)+'</h2>'+
+  '<small>محرر متكامل لفرد واحد للحفاظ على الأداء · البيانات الحساسة خاصة ومشفّرة</small></div>'+
+  '<a href="/admin/genealogy" class="gen-compact-button">إغلاق المحرر</a></div>'+
+  '<div class="gen-editor-layout"><div class="gen-editor-main">'+edit+'</div>'+
+  '<aside class="gen-editor-side"><div class="gen-side-panel"><h3>حالة السجل</h3><span class="gen-pill">'+e(status[p.record_status]||p.record_status)+'</span>'+
+  '<p class="gen-muted">ترتبط بيانات الأنساب بمراجعة موثقة. لا يؤدي تغيير البيانات الخاصة إلى نشرها للعامة.</p></div>'+
+  '<details class="gen-details"><summary>أرشفة / استعادة السجل</summary>'+archive+'</details>'+
+  '<details class="gen-details gen-danger"><summary>حذف المسودة (إن لم تكن مرتبطة)</summary>'+remove+'</details></aside></div></section>';
 }
 function unitRows(data){
  const visible=data.units.slice(0,450);
@@ -147,7 +202,7 @@ export function genealogyView(data,csrf){
   '<p class="gen-muted">الفخذ يحتاج أصلًا من الفروع، والعائلة تحتاج فخذًا. السجلات الجديدة لا تُنشر قبل اعتمادها.</p>', 'إضافة الفخذ أو العائلة');
  return '<style>'+genealogyStyles+'</style><div class="gen-shell">'+
   '<div class="gen-summary">'+metrics+'</div>'+
-  '<div class="gen-note"><strong>خصوصية وتوثيق:</strong><span>أرقام الهوية لا تُعرض أو تُحفظ بنص صريح، وإنما بصمات HMAC مع آخر ٤ خانات فقط. الأفراد والأجداد الجدد ينشؤون بحالة «تحت المراجعة» وبعرض خاص. الحذف المسموح لا يشمل السجلات المعتمدة أو المرتبطة بنسب آخر.</span></div>'+
+  '<div class="gen-note"><strong>خصوصية وتوثيق:</strong><span>أرقام الهوية لا تُعرض بنص صريح، ويُحفظ رقمها مشفرًا مع بصمة مطابقة HMAC وآخر ٤ خانات فقط. الأفراد والأجداد الجدد ينشؤون بحالة «تحت المراجعة» وبعرض خاص. الحذف المسموح لا يشمل السجلات المعتمدة أو المرتبطة بنسب آخر.</span></div>'+
   '<section class="gen-section"><div class="gen-section-head"><div class="gen-section-header"><span class="gen-section-icon">⌕</span><div><h2>البحث عن هوية مسجلة</h2><small>كشف التطابق دون إظهار الرقم الأصلي أو إضافته إلى عنوان الصفحة</small></div></div></div>'+
     identityBox+identitySearch+'</section>'+
   (data.canEditPeople?'<section class="gen-section" id="gen-tree-create"><div class="gen-section-head"><div class="gen-section-header"><span class="gen-section-icon">♧</span><div><h2>إضافة فرد ونسبه الكامل</h2><small>الفرد ← الأب والأم ← الجد والجدة من الجهتين</small></div></div></div>'+
