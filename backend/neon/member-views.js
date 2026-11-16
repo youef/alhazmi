@@ -187,7 +187,7 @@ export function dashboard(user, modules, status, isAdmin = false) {
       `<a class="tile card" href="/dashboard/${key}">${icon(glyphs[key] ? key : groupIcons[index])}<strong>${moduleNames[key]}</strong><span>فتح القسم ←</span></a>`).join('')}</div></section>` : '';
   }).join('');
   return page('لوحة التحكم', `<section class="member-hero"><div><h1>لوحة التحكم</h1><p>مرحبًا، ${e(user.name)}</p></div>${isAdmin ? badge("مدير عام — صلاحيات النظام") : badge(status)}
-    <div class="actions"><a class="action-link" href="/profile">الملف الشخصي</a><a class="action-link secondary" href="/">رئيسية البوابة</a><a class="action-link secondary" href="/family/manage">إدارة أسرتي</a>${isAdmin ? '<a class="action-link" href="/admin">مركز الإدارة المتقدم</a>' : ''}</div>
+    <div class="actions"><a class="action-link" href="/profile">الملف الشخصي</a><a class="action-link secondary" href="/">رئيسية البوابة</a><a class="action-link secondary" href="/family/manage">إدارة أسرتي</a>${isAdmin ? '<a class="action-link" href="/admin">مركز الإدارة المتقدم</a><a class="action-link" href="/admin/genealogy">إدارة الأفراد والأنساب</a>' : ''}</div>
   </section>
   <section class="overview" aria-label="نظرة عامة على الحساب">
     <div class="card"><h2>حالة العضوية</h2><p class="value">${e(status)}</p></div>${isAdmin ? '<div class="card"><h2>مستوى الوصول</h2><p class="value">مدير عام</p></div>' : ''}
