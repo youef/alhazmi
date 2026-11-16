@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { sealPrivate, unsealPrivate } from './private-fields.js';
 import { authorized, HttpError, isId, pool } from './shared.js';
 import { csrfFor } from './admin.js';
 import { cleanName, canonicalName, fingerprintIdentity, relativePlan, assertDistinctParents, UNIT_TYPES, RELATIVE_ROLES } from './genealogy-rules.js';
@@ -150,14 +151,82 @@ async function createFamilyTree(db,user,form) {
  await journal(db,user,'genealogy_tree_created','people',ids.person,{recordsCreated:creations.length,hasFather:!!ids.father,hasMother:!!ids.mother,hasPaternalGrandparents:!!(ids.father_father||ids.father_mother),hasMaternalGrandparents:!!(ids.mother_father||ids.mother_mother)});
  return ids.person;
 }
+const PRIVATE_INPUTS=[
+ ['phone_ciphertext','phone',32],
+ ['email_ciphertext','email',254],
+ ['employer_ciphertext','employer',200],
+ ['job_title_ciphertext','job_title',160],
+ ['private_notes_ciphertext','private_notes',5000],
+];
+const ADDRESS_INPUTS=[
+ ['short_code',12],['building_number',8],['street',160],['district',130],
+ ['postal_code',10],['additional_number',10],['unit_number',20],
+ ['address_details',750]
+];
+function privateAddress(form){
+ const obj={};
+ for(const [key,max] of ADDRESS_INPUTS)obj[key]=field(form,'address_'+key,max);
+ if(obj.postal_code && !/^\d{5}$/.test(obj.postal_code))throw new HttpError(400,'الرمز البريدي يجب أن يتكون من خمسة أرقام');
+ if(obj.building_number && !/^\d{4}$/.test(obj.building_number))throw new HttpError(400,'رقم المبنى يجب أن يتكون من أربعة أرقام');
+ if(obj.additional_number && !/^\d{4}$/.test(obj.additional_number))throw new HttpError(400,'الرقم الإضافي يجب أن يتكون من أربعة أرقام');
+ return Object.values(obj).some(Boolean)?JSON.stringify(obj):null;
+}
+async function updatePrivateDetails(db,user,form,personId){
+ const identifier=field(form,'identity',50),kind=field(form,'identifier_type',30)||'national_id';
+ const remove=field(form,'remove_identity',10)==='yes';
+ if(remove&&identifier)throw new HttpError(400,'اختر إزالة الهوية أو إضافة رقم بديل، وليس الإجراءين معًا');
+ if(!['national_id','residency','passport','birth_certificate'].includes(kind))throw new HttpError(400,'نوع الهوية غير صالح');
+ const current=await db.query("select id,status,identifier_type,identifier_hmac from public.person_identifiers where person_id=$1 and status<>'revoked' for update",[personId]);
+ const prior=await db.query('select * from public.person_private where person_id=$1 for update',[personId]);
+ let idCipher=prior.rows[0]?.national_id_ciphertext||null;
+ let last4=prior.rows[0]?.national_id_last4||null;
+ if(remove){
+   if(current.rows.some(row=>row.status==='verified'))throw new HttpError(409,'الهوية المعتمدة تتطلب طلب تصحيح ومراجعة قبل إلغائها');
+   await db.query("update public.person_identifiers set status='revoked' where person_id=$1 and status in ('pending','disputed')",[personId]);
+   idCipher=null;last4=null;
+ }else if(identifier){
+   const hashed=identity(identifier,kind);
+   const other=await db.query("select 1 from public.person_identifiers where identifier_type=$1 and identifier_hmac=$2 and person_id<>$3 and status<>'revoked' limit 1",[kind,hashed.digest,personId]);
+   if(other.rowCount)throw new HttpError(409,'رقم الوثيقة مرتبط بشخص آخر؛ يلزم مراجعة التطابق');
+   const matching=current.rows.find(row=>row.identifier_type===kind&&row.identifier_hmac.equals(hashed.digest));
+   if(!matching){
+     if(current.rows.some(row=>row.identifier_type===kind&&row.status==='verified'))throw new HttpError(409,'لا يمكن استبدال هوية معتمدة مباشرة؛ ارفع طلب تصحيح');
+     await db.query("update public.person_identifiers set status='revoked' where person_id=$1 and identifier_type=$2 and status in ('pending','disputed')",[personId,kind]);
+     await db.query("insert into public.person_identifiers(person_id,country_code,issuer,identifier_type,identifier_hmac,hmac_key_version,masked_value,status,encrypted_value) values($1,'SA','admin-supplied',$2,$3,1,$4,'pending',$5)",[personId,kind,hashed.digest,'******'+hashed.last4,sealPrivate(identifier,personId,'identity:'+kind)]);
+   }
+   idCipher=sealPrivate(identifier,personId,'national_id');
+   last4=hashed.last4;
+ }
+ const email=field(form,'email',254);
+ if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new HttpError(400,'البريد الإلكتروني غير صالح');
+ const phone=field(form,'phone',32);
+ if(phone&&!/^\+?[0-9 \-()]{7,32}$/.test(phone))throw new HttpError(400,'رقم الجوال غير صالح');
+ const values={person_id:personId,national_id_ciphertext:idCipher,national_id_last4:last4};
+ for(const [col,name,max] of PRIVATE_INPUTS)values[col]=sealPrivate(field(form,name,max),personId,name);
+ values.national_address_ciphertext=sealPrivate(privateAddress(form),personId,'national_address');
+ values.city=field(form,'city',100)||null;
+ values.region=field(form,'region',100)||null;
+ values.country=field(form,'country',2).toUpperCase()||'SA';
+ if(!/^[A-Z]{2}$/.test(values.country))throw new HttpError(400,'رمز الدولة يجب أن يكون بحرفين');
+ values.employment_status=field(form,'employment_status',30)||null;
+ if(values.employment_status&&!['employed','self_employed','unemployed','student','retired','unknown'].includes(values.employment_status))throw new HttpError(400,'الحالة الوظيفية غير صالحة');
+ values.education_level=field(form,'education_level',120)||null;
+ const columns=Object.keys(values),params=Object.values(values);
+ const insert='insert into public.person_private('+columns.join(',')+') values('+columns.map((_,i)=>'$'+(i+1)).join(',')+')';
+ const update=columns.filter(k=>k!=='person_id').map(k=>k+'=excluded.'+k).join(',');
+ await db.query(insert+' on conflict(person_id) do update set '+update+',updated_at=now()',params);
+ await journal(db,user,'genealogy_private_details_updated','person_private',personId,{identityChanged:!!(identifier||remove),fields:['contact','address','work','education','private_notes']});
+}
 async function changePerson(db,user,form){
  const personId=uuid(form.get('id'),true);
  const person=await getPerson(db,personId);
  const name=requiredName(field(form,'full_name'));
  const gender=field(form,'gender',20);
  const dob=safeDate(form.get('birth_date'));
+ const deceasedOn=safeDate(form.get('death_date'));
  const living=field(form,'living_status',20)||'unknown';
  if(!['alive','deceased','unknown'].includes(living))throw new HttpError(400,'حالة الحياة غير صالحة');
+ if(living==='alive'&&deceasedOn)throw new HttpError(400,'لا يمكن تسجيل تاريخ وفاة لشخص حي');
  const family=uuid(form.get('family_id'));
  if(!['male','female','unknown','undisclosed'].includes(gender))throw new HttpError(400,'الجنس غير صالح');
  await getFamily(db,family,person.tribe_id);
@@ -165,14 +234,13 @@ async function changePerson(db,user,form){
  validateParents(father,mother,personId);
  if(father)await checkCycle(db,personId,father);
  if(mother)await checkCycle(db,personId,mother);
- if((person.father_id && person.father_id!==father)||(person.mother_id && person.mother_id!==mother)){
-  // Removal or replacement of proven ancestors requires a separate evidence-review workflow.
-  throw new HttpError(409,'لا يمكن حذف أو استبدال نسب مسجل مباشرة؛ ارفع طلب مراجعة وتصحيح أولًا');
- }
- await db.query("update public.people set full_name_ar=$2,given_name_ar=$3,normalized_name=$4,gender=$5,family_unit_id=$6,birth_place=$7,biography=$8,birth_date=$9,birth_date_precision=case when $9::date is null then 'unknown' else 'day' end,living_status=$10,record_status='under_review',visibility='private',updated_at=now() where id=$1",
-  [personId,name,name.split(' ')[0],canonicalName(name),gender,family,field(form,'birth_place',120)||null,field(form,'biography',1000)||null,dob,living]);
+ if((person.father_id&&person.father_id!==father)||(person.mother_id&&person.mother_id!==mother))
+   throw new HttpError(409,'لا يمكن حذف أو استبدال نسب مسجل مباشرة؛ ارفع طلب مراجعة وتصحيح أولًا');
+ await updatePrivateDetails(db,user,form,personId);
+ await db.query("update public.people set full_name_ar=$2,given_name_ar=$3,normalized_name=$4,gender=$5,family_unit_id=$6,birth_place=$7,biography=$8,birth_date=$9,birth_date_precision=case when $9::date is null then 'unknown' else 'day' end,living_status=$10,death_date=$11,death_date_precision=case when $11::date is null then 'unknown' else 'day' end,record_status='under_review',visibility='private',updated_at=now() where id=$1",
+  [personId,name,name.split(' ')[0],canonicalName(name),gender,family,field(form,'birth_place',120)||null,field(form,'biography',4000)||null,dob,living,deceasedOn]);
  if(father||mother)await connectParents(db,personId,father,mother);
- await journal(db,user,'genealogy_person_updated','people',personId,{changedFields:['name','gender','family','bio','parents'],needsReview:true});
+ await journal(db,user,'genealogy_person_updated','people',personId,{changedFields:['name','gender','family','birth','death','bio','parents','private_details'],needsReview:true});
 }
 async function archivePerson(db,user,form,restore=false){
  const id=uuid(form.get('id'),true);
@@ -348,9 +416,19 @@ export async function genealogyData(user,url){
   pool.query("select (select count(*) from public.people) people,(select count(*) from public.people where record_status='under_review') drafts,(select count(*) from public.lineage_units) units,(select count(*) from public.lineage_seed_reviews where review_status='needs_review') unit_reviews"),
   pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) identity_mask from public.people p where p.record_status<>'archived' order by p.full_name_ar limit 400"),
   pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units order by name_ar limit 1200'),
-  focusPersonId?pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.birth_date,p.living_status,p.birth_place,p.biography from public.people p where p.id=$1 limit 1",[focusPersonId]):Promise.resolve({rows:[]}),
+  focusPersonId?pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.birth_date,p.death_date,p.living_status,p.birth_place,p.biography,pp.* from public.people p left join public.person_private pp on pp.person_id=p.id where p.id=$1 limit 1",[focusPersonId]):Promise.resolve({rows:[]}),
   focusUnitId?pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units where id=$1 limit 1',[focusUnitId]):Promise.resolve({rows:[]})
  ]);
  const permissions=await Promise.all(['identity.edit','lineage.structure_apply'].map(key=>authorized(user,key)));
- return {tribes:tribes.rows,people:people.rows,directory:directory.rows,childOf:directory.rows.find(p=>p.id===childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows,focusedPerson:focusPerson.rows[0]||null,focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
+ const focused=focusPerson.rows[0]||null;
+ if(focused&&permissions[0]){
+   for(const [column,name] of PRIVATE_INPUTS)
+     focused[name]=unsealPrivate(focused[column],focused.id,name);
+   const address=unsealPrivate(focused.national_address_ciphertext,focused.id,'national_address');
+   focused.private_address=address?JSON.parse(address):{};
+ }
+ if(focused){
+   for(const key of ['national_id_ciphertext','phone_ciphertext','email_ciphertext','national_address_ciphertext','employer_ciphertext','job_title_ciphertext','private_notes_ciphertext'])delete focused[key];
+ }
+ return {tribes:tribes.rows,people:people.rows,directory:directory.rows,childOf:directory.rows.find(p=>p.id===childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows,focusedPerson:focused,focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
 }
