@@ -345,14 +345,14 @@ button { cursor: pointer; }
 /* Heritage identity: shared with the member and management portals. */
 .site-root{--muted:#725d4c}
 .brand-seal{width:64px;height:64px;background:#30251c;border-color:#bd925b66;border-radius:50%;box-shadow:none}.brand-seal img{object-fit:contain}
-.portal-banner{display:flex;align-items:center!important;min-height:580px;background:linear-gradient(90deg,transparent 20%,#25180c33 55%,#25180c88),url('https://youef.github.io/alhazmi/brand/heritage-hero.webp') center/cover;isolation:isolate}
+.portal-banner{display:flex;align-items:center!important;min-height:580px;background:linear-gradient(90deg,transparent 20%,#25180c33 55%,#25180c88),var(--hero-image) center/cover;isolation:isolate}
 .portal-banner:before,.portal-banner:after{display:none}.banner-content{width:52%;padding-block:38px;position:relative;z-index:1}.banner-content h1{font-size:clamp(2.7rem,5vw,4.7rem);margin-block:16px 22px}.banner-content p:not(.banner-kicker){font-size:1.08rem}.banner-kicker{font-size:.85rem;letter-spacing:0}.primary-button{margin-top:16px;background:#d9b17a;color:#2b1c12;border:1px solid #efd1a3;min-height:48px}.primary-button:hover{background:#ebc998;color:#2b1c12}
 .section-card{position:relative;overflow:hidden;transition:transform .2s,border-color .2s}.section-card:hover{transform:translateY(-4px)}.section-heading{border-bottom:1px solid var(--line);padding-bottom:18px}
-.heritage-strip{margin:12px 0 36px;min-height:270px;padding:40px;border-radius:22px;color:#fff3e4;background:linear-gradient(90deg,#281b1040,#281b10ed 65%),url('https://youef.github.io/alhazmi/brand/heritage-hero.webp') left 58%/cover}.heritage-strip>div{max-width:580px}.heritage-label{font-size:.78rem;color:#e1bd85}.heritage-strip h2{font-size:clamp(1.5rem,3vw,2.1rem);margin-block:12px}.heritage-strip p{color:#eed9bf}.heritage-strip a{display:inline-flex;align-items:center;gap:12px;color:#efd1a3;margin-top:18px;font-weight:700}
-.area-header{background:linear-gradient(90deg,#302117c9,#302117f5),url('https://youef.github.io/alhazmi/brand/heritage-hero.webp') center/cover;color:#fff1df;border-color:#b88e5c}.area-header .inner-lead,.area-header nav,.area-header nav a{color:#e9cfb0}.area-header h1{color:#fff1df}
+.heritage-strip{margin:12px 0 36px;min-height:270px;padding:40px;border-radius:22px;color:#fff3e4;background:linear-gradient(90deg,#281b1040,#281b10ed 65%),var(--hero-image) left 58%/cover}.heritage-strip>div{max-width:580px}.heritage-label{font-size:.78rem;color:#e1bd85}.heritage-strip h2{font-size:clamp(1.5rem,3vw,2.1rem);margin-block:12px}.heritage-strip p{color:#eed9bf}.heritage-strip a{display:inline-flex;align-items:center;gap:12px;color:#efd1a3;margin-top:18px;font-weight:700}
+.area-header{background:linear-gradient(90deg,#302117c9,#302117f5),var(--hero-image) center/cover;color:#fff1df;border-color:#b88e5c}.area-header .inner-lead,.area-header nav,.area-header nav a{color:#e9cfb0}.area-header h1{color:#fff1df}
 :focus-visible{outline:3px solid #b87945;outline-offset:4px}
 [dir=ltr] .portal-banner{background-position:center}.site-root[dir=ltr] .banner-content{margin-left:auto}
-@media(max-width:819px){.portal-banner{min-height:620px;align-items:end!important;background-position:30% center;background-image:linear-gradient(0deg,#24170bf5, #24170bb0 40%,transparent 80%),url('https://youef.github.io/alhazmi/brand/heritage-hero.webp')}.banner-content{width:100%;padding:230px 0 0}.banner-content h1{font-size:2.7rem}.heritage-strip{padding:28px;background-position:25% center}.brand-seal{width:52px;height:52px}.brand-seal img{width:46px;height:46px}}
+@media(max-width:819px){.portal-banner{min-height:620px;align-items:end!important;background-position:30% center;background-image:linear-gradient(0deg,#24170bf5, #24170bb0 40%,transparent 80%),var(--hero-image)}.banner-content{width:100%;padding:230px 0 0}.banner-content h1{font-size:2.7rem}.heritage-strip{padding:28px;background-position:25% center}.brand-seal{width:52px;height:52px}.brand-seal img{width:46px;height:46px}}
 @media(prefers-reduced-motion:reduce){.section-card{transition:none}.section-card:hover{transform:none}}
 
 /* Diwan unified heritage system — responsive polish */
@@ -401,4 +401,27 @@ button { cursor: pointer; }
 @media(prefers-reduced-motion:reduce){
   .site-root .main-nav a,.site-root .primary-button,.site-root .directory-load-more,.site-root .directory-retry{transition:none}
   .site-root .primary-button:hover{transform:none}
+}
+
+/* Footer, approval steps and print */
+.footer-grid { display: grid; gap: 24px; padding-block: 32px; font-size: .86rem; }
+.footer-grid h2 { margin: 0 0 8px; font-size: .9rem; font-weight: 800; color: #efd1a3; }
+.footer-grid nav { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.footer-grid nav a { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; }
+.footer-about p { margin: 8px 0 0; max-width: 34rem; color: #d9e8df; }
+.footer-note { font-size: .78rem; opacity: .85; }
+@media (min-width: 760px) { .footer-grid { grid-template-columns: 1.6fr 1fr 1fr; } }
+
+.approval-steps { margin-block: 12px 28px; }
+.approval-steps h2 { margin: 0 0 16px; font-size: clamp(1.25rem, 2.6vw, 1.6rem); font-weight: 800; }
+.approval-steps ol { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.approval-steps li { display: flex; gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.approval-steps h3 { margin: 0 0 4px; font-size: 1rem; font-weight: 800; }
+.approval-steps p { margin: 0; color: var(--muted); font-size: .88rem; }
+.step-number { display: grid; flex: 0 0 auto; width: 38px; height: 38px; place-items: center; border-radius: 50%; background: var(--soft); color: var(--accent); font-weight: 800; }
+@media (min-width: 820px) { .approval-steps ol { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+@media print {
+  .site-header, .footer, .skip-link, .directory-toolbar, .directory-load-more { display: none !important; }
+  .site-root { background: #fff; color: #000; }
 }

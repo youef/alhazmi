@@ -31,6 +31,12 @@ export const dictionary = {
     editorial: 'يُراجع المحتوى قبل نشره، ولا تُعد البيانات قيد المراجعة إثباتًا رسميًا للنسب.',
     footer: 'ديوان الحازمي — مبادرة أهلية غير حكومية.',
     returnHome: 'العودة للرئيسية',
+    stepsTitle: 'كيف يُعتمد النسب قبل نشره؟',
+    steps: [
+      { title: 'طلب أو إضافة', body: 'يرسل العضو أو المشرف المعلومة مع مصدرها. لا تتحول الأسماء المدخلة إلى حقيقة منشورة تلقائيًا.' },
+      { title: 'مراجعة مستقلة', body: 'يراجعها مفوَّض غير مقدّم الطلب، وتُطابق مع المصادر والروابط القائمة.' },
+      { title: 'اعتماد للنشر', body: 'تظهر في الدليل العام الوحدات المعتمدة فقط، دون بيانات الأحياء أو القاصرين أو الوثائق الخاصة.' },
+    ],
     soon: 'قريبًا',
   },
   en: {
@@ -53,6 +59,12 @@ export const dictionary = {
     editorial: 'Content is reviewed before publication. Draft genealogical data does not certify ancestry.',
     footer: 'Alhazmi Diwan — an independent community initiative.',
     returnHome: 'Return home',
+    stepsTitle: 'How is lineage approved before publication?',
+    steps: [
+      { title: 'Request or submission', body: 'A member or supervisor submits information with its source. Entered names never become published facts automatically.' },
+      { title: 'Independent review', body: 'An authorized reviewer other than the submitter checks it against sources and existing links.' },
+      { title: 'Approved for publication', body: 'Only approved units appear in the public directory, with no living individuals, minors or private documents.' },
+    ],
     soon: 'Coming soon',
   }
 } as const;
