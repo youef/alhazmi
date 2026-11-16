@@ -40,7 +40,7 @@ jobs:
       PGPASSWORD: local_test_only
       PGDATABASE: alhazmi_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Prepare minimal Supabase auth compatibility for isolated tests
         run: |
           psql -X -v ON_ERROR_STOP=1 <<'SQL'
