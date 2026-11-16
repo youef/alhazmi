@@ -255,6 +255,107 @@ async function changePerson(db,user,form){
  if(father||mother)await connectParents(db,personId,father,mother);
  await journal(db,user,'genealogy_person_updated','people',personId,{changedFields:['name','gender','family','birth','death','bio','parents','private_details'],needsReview:true});
 }
+
+const FAMILY_RELATIONS={
+ father:{parent:'self',slot:'father',gender:'male'},
+ mother:{parent:'self',slot:'mother',gender:'female'},
+ father_father:{parent:'father',slot:'father',gender:'male'},
+ father_mother:{parent:'father',slot:'mother',gender:'female'},
+ mother_father:{parent:'mother',slot:'father',gender:'male'},
+ mother_mother:{parent:'mother',slot:'mother',gender:'female'},
+ child:{parent:'child'},
+ spouse:{parent:'spouse'}
+};
+function relationGender(role,raw){
+ const expected=FAMILY_RELATIONS[role]?.gender;
+ const gender=expected||raw||'unknown';
+ if(!['male','female','unknown','undisclosed'].includes(gender))throw new HttpError(400,'الجنس المسجل للقريب غير صالح');
+ return gender;
+}
+function sameLineageFamily(person,role,parent){
+ // Only infer paternal family ancestry; maternal relatives and spouses may
+ // belong to different houses, and must not be assigned one implicitly.
+ if(role==='father'||(role==='child'&&person.gender==='male'))return person.family_unit_id||null;
+ if((role==='father_father'||role==='mother_father')&&parent)return parent.family_unit_id||null;
+ return null;
+}
+async function addPersonRelation(db,user,form){
+ const personId=uuid(form.get('person_id'),true),person=await getPerson(db,personId);
+ const role=field(form,'relation_role',30),spec=FAMILY_RELATIONS[role];
+ if(!spec)throw new HttpError(400,'نوع صلة القرابة غير مدعوم');
+ if(role==='child'&&!['male','female'].includes(person.gender))
+  throw new HttpError(409,'حدد جنس الفرد الأساسي أولًا لربط الأبناء بالأب أو الأم بصورة صحيحة');
+ let parent=person;
+ if(spec.parent==='father'||spec.parent==='mother'){
+  const parentId=person[spec.parent+'_id'];
+  if(!parentId)throw new HttpError(409,'أضف '+(spec.parent==='father'?'الأب':'الأم')+' إلى سجل الفرد أولًا، ثم أضف الجد أو الجدة');
+  parent=await getPerson(db,parentId);
+ }
+ const selectedId=uuid(form.get('relative_id'));
+ const fullName=field(form,'relative_name',200);
+ const identityValue=field(form,'relative_identity',50);
+ const kind=field(form,'relative_identity_kind',30)||'national_id';
+ const hash=identityValue?identity(identityValue,kind):null;
+ let identified=null;
+ if(hash){
+  const matched=await db.query("select p.id,p.tribe_id,p.full_name_ar from public.person_identifiers i join public.people p on p.id=i.person_id where i.country_code='SA' and i.identifier_type=$1 and i.identifier_hmac=$2 and i.status in ('pending','verified','disputed') limit 1",[kind,hash.digest]);
+  identified=matched.rows[0]||null;
+ }
+ if(selectedId&&identified&&identified.id!==selectedId)
+  throw new HttpError(409,'رقم الهوية المدخل يعود لسجل مختلف عن الشخص المختار');
+ const existingId=selectedId||identified?.id||null;
+ if(identified&&!selectedId&&field(form,'confirm_reuse',5)!=='yes')
+  throw new HttpError(409,'الهوية موجودة مسبقًا؛ وافق على ربط سجل الشخص الموجود بعد مراجعة اسمه');
+ let relative,created=false;
+ if(existingId){
+  relative=await getPerson(db,existingId);
+  if(relative.tribe_id!==person.tribe_id)throw new HttpError(409,'السجل من قبيلة مختلفة؛ يلزم مراجعة ارتباطه أولًا');
+  if(fullName&&canonicalName(relative.full_name_ar)!==canonicalName(fullName))
+   throw new HttpError(409,'الهوية أو السجل المختار يعود لاسم مختلف؛ تحقق من الاسم قبل الربط');
+  const expected=spec.gender;
+  if(expected&&relative.gender!==expected)
+   throw new HttpError(409,'جنس الشخص المسجل لا يتوافق مع صلة الأب أو الأم أو الأجداد');
+  if(hash&&!identified){
+   await db.query("insert into public.person_identifiers(person_id,country_code,issuer,identifier_type,identifier_hmac,hmac_key_version,masked_value,status,encrypted_value) values($1,'SA','admin-supplied',$2,$3,1,$4,'pending',$5)",[relative.id,kind,hash.digest,'******'+hash.last4,sealPrivate(identityValue,relative.id,'identity:'+kind)]);
+   await journal(db,user,'genealogy_identifier_added_to_relative','person_identifiers',relative.id,{type:kind});
+  }
+ }else{
+  const name=requiredName(fullName);
+  const gender=relationGender(role,field(form,'relative_gender',20));
+  const duplicate=await db.query("select id from public.people where tribe_id=$1 and normalized_name=$2 and record_status<>'archived' limit 1",[person.tribe_id,canonicalName(name)]);
+  if(duplicate.rowCount)throw new HttpError(409,'اسم مطابق موجود سابقًا؛ ابحث عنه وحدده أو أدخل رقم الهوية لتفادي التكرار');
+  const explicitFamily=uuid(form.get('relative_family_id'));
+  if(explicitFamily)await getFamily(db,explicitFamily,person.tribe_id);
+  const family=explicitFamily||sameLineageFamily(person,role,parent);
+  const born=safeDate(form.get('relative_birth_date'));
+  const inserted=await db.query("insert into public.people(tribe_id,family_unit_id,given_name_ar,full_name_ar,normalized_name,gender,birth_date,birth_date_precision,birth_place,living_status,record_status,visibility,created_by) values($1,$2,$3,$4,$5,$6,$7,case when $7::date is null then 'unknown' else 'day' end,$8,$9,'under_review','private',$10) returning id",
+   [person.tribe_id,family,name.split(' ')[0],name,canonicalName(name),gender,born,field(form,'relative_birth_place',120)||null,field(form,'relative_living_status',20)||'unknown',user.id]);
+  relative={id:inserted.rows[0].id,tribe_id:person.tribe_id,gender,full_name_ar:name,father_id:null,mother_id:null,record_status:'under_review',family_unit_id:family};
+  created=true;
+  const details=new URLSearchParams();
+  for(const key of ['phone','email','city','region','country','employment_status','education_level','employer','job_title','private_notes',
+    'address_short_code','address_building_number','address_street','address_district',
+    'address_postal_code','address_additional_number','address_unit_number','address_address_details']){
+    details.set(key,String(form.get('relative_'+key)||''));
+  }
+  details.set('identity',identityValue);
+  details.set('identifier_type',kind);
+  await updatePrivateDetails(db,user,details,relative.id);
+ }
+ if(relative.id===person.id||relative.id===parent.id)
+  throw new HttpError(409,'لا يجوز ربط شخص بنفسه كأحد أقاربه');
+ if(role==='spouse'){
+  const current=await db.query("select id,status from public.marriages where (partner_a_id=$1 and partner_b_id=$2) or (partner_a_id=$2 and partner_b_id=$1) order by created_at desc limit 1",[person.id,relative.id]);
+  if(current.rowCount)throw new HttpError(409,'توجد علاقة زواج مسجلة بين الشخصين بالفعل؛ راجعها بدل إضافتها مرة أخرى');
+  await db.query("insert into public.marriages(partner_a_id,partner_b_id,start_date,status,notes) values($1,$2,$3,'reported',$4)",[person.id,relative.id,safeDate(form.get('marriage_start_date')),'إضافة إدارية تنتظر التوثيق']);
+ }else if(role==='child'){
+  await connectParents(db,relative.id,person.gender==='male'?person.id:null,person.gender==='female'?person.id:null,{newRecord:created});
+ }else{
+  await connectParents(db,parent.id,spec.slot==='father'?relative.id:null,spec.slot==='mother'?relative.id:null,{newRecord:false});
+ }
+ await journal(db,user,'genealogy_relation_added','people',person.id,{relativeId:relative.id,relation:role,created,needsReview:true});
+ return person.id;
+}
 async function archivePerson(db,user,form,restore=false){
  const id=uuid(form.get('id'),true);
  if(form.get('confirm')!=='yes')throw new HttpError(400,'تأكيد الإجراء مطلوب');
@@ -376,6 +477,7 @@ async function deleteUnitDraft(db,user,form){
 }
 const ACTIONS={
  create_tree:['identity.edit',createFamilyTree],
+ add_relation:['identity.edit',addPersonRelation],
  edit_person:['identity.edit',changePerson],
  archive_person:['identity.edit',(db,u,f)=>archivePerson(db,u,f)],
  restore_person:['identity.edit',(db,u,f)=>archivePerson(db,u,f,true)],
