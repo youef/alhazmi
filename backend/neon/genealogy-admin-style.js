@@ -57,6 +57,40 @@ export const genealogyStyles=`
 .gen-small{font-size:.74rem;color:#887462}
 .gen-step-notice{margin:5px 0 10px;background:#f4e9d9;color:#79512e;border-radius:10px;padding:10px 12px;line-height:1.8;font-size:.8rem}
 .gen-form select[name=father_id],.gen-form select[name=mother_id]{max-width:100%}
+
+/* The single-person editor stays compact even with complete encrypted profile fields. */
+.gen-editor{scroll-margin-top:18px;background:linear-gradient(180deg,#fffdf8 0%,#fffefa 100%)}
+.gen-editor-eyebrow{display:inline-block;letter-spacing:.06em;color:#ac7650;font-weight:900;font-size:.72rem;margin-bottom:5px}
+.gen-editor-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(235px,280px);gap:18px;align-items:start}
+.gen-editor-main{min-width:0}
+.gen-editor-main>.gen-form{gap:15px}
+.gen-editor-side{display:grid;gap:12px;position:sticky;top:15px;min-width:0}
+.gen-side-panel{display:grid;gap:11px;padding:18px;background:linear-gradient(145deg,#32251d,#60402a);color:#fff;border-radius:16px;box-shadow:0 10px 22px #4b24181c}
+.gen-side-panel h3{color:#fff;font-size:1rem}
+.gen-side-panel .gen-muted{color:#f1dfce}
+.gen-side-panel .gen-pill{width:fit-content;background:#f2d5ad;color:#3c2819}
+.gen-edit-fieldset{border:1px solid #e7d8c5;border-radius:15px;padding:clamp(14px,2.5vw,20px);background:#fff;min-width:0}
+.gen-edit-fieldset>legend{font-size:1rem;font-weight:900;padding:0 11px;color:#8c4b2c}
+.gen-edit-fieldset .gen-form-grid{margin-top:6px}
+.gen-form-grid .gen-full{grid-column:1/-1;min-width:0}
+.gen-edit-fieldset p{margin-block:10px 0}
+.gen-edit-fieldset label{font-size:.84rem}
+.gen-edit-fieldset input,.gen-edit-fieldset select,.gen-edit-fieldset textarea{transition:border-color .16s ease,box-shadow .16s ease}
+.gen-edit-fieldset input:focus,.gen-edit-fieldset select:focus,.gen-edit-fieldset textarea:focus{box-shadow:0 0 0 3px #cb956331}
+.gen-edit-fieldset textarea{width:100%;resize:vertical;line-height:1.8;min-height:85px}
+.gen-edit-fieldset textarea[name=private_notes]{min-height:178px}
+.gen-sensitive{padding:13px 15px;background:#f3f5ed;border:1px solid #dce7d5;border-radius:12px;color:#4a5d3d!important}
+.gen-editor .gen-submit{min-width:210px;min-height:49px;background:linear-gradient(120deg,#8c442b,#be7849);box-shadow:0 8px 16px #8a482a26}
+.gen-editor .gen-submit:hover{background:#74381f}
+.gen-danger{border-color:#eac7bf;background:#fff7f5}
+.gen-danger>summary{color:#b4493d}
+.gen-danger .gen-submit{background:#a63b32}
+.gen-section:focus-within{border-color:#d4b89c}
+.gen-search input{min-height:45px}
+.gen-action-group a,.gen-compact-button{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;transition:transform .12s ease,background .12s ease}
+.gen-action-group a:hover,.gen-compact-button:hover{background:#e9d3b6;transform:translateY(-1px)}
+@media(max-width:1050px){.gen-editor-layout{grid-template-columns:minmax(0,1fr)}.gen-editor-side{position:static;grid-template-columns:repeat(2,minmax(0,1fr))}.gen-side-panel{grid-column:1/-1}}
+@media(max-width:620px){.gen-editor-side{grid-template-columns:1fr}.gen-editor .gen-submit{width:100%}.gen-edit-fieldset{padding:13px}.gen-editor-layout{gap:13px}}
 @media(max-width:1000px){.gen-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){
  .gen-grid,.gen-form-grid,.gen-relative,.gen-identity-row{grid-template-columns:1fr}
