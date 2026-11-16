@@ -15,7 +15,8 @@ const form=(operation,csrf,body,label)=>
  '<button class="gen-submit" type="submit">'+e(label)+'</button></form>';
 
 function selectParents(data, role, selected=''){
- return '<select name="'+e(role)+'_id" aria-label="اختيار '+e(role)+'" >'+options(data.directory,'id',p=>p.full_name_ar+' — '+(gender[p.gender]||'')+' · '+(p.identity_mask||'بلا هوية'),selected)+'</select>';
+ const opts=options(data.directory,'id',p=>p.full_name_ar+' — '+(gender[p.gender]||'')+' · '+(p.identity_mask||'بلا هوية'),selected);
+ return '<select name="'+e(role)+'_id" aria-label="اختيار '+e(role)+'" >'+(selected?opts.replace('<option value="">','<option value="" disabled>'):opts)+'</select>';
 }
 function relative(data,role,label,genderAr){
  const auto=data.childOf && ((role==='father'&&data.childOf.gender==='male')||(role==='mother'&&data.childOf.gender==='female'))?data.childOf.id:'';
