@@ -148,6 +148,19 @@ async function createFamilyTree(db,user,form) {
  if(ids.father) await connectParents(db,ids.father,ids.father_father||null,ids.father_mother||null,{newRecord:creations.includes('father')});
  if(ids.mother) await connectParents(db,ids.mother,ids.mother_father||null,ids.mother_mother||null,{newRecord:creations.includes('mother')});
  await connectParents(db,ids.person,ids.father||null,ids.mother||null,{newRecord:true});
+ // Save contact, national address, education and private notes in the same transaction.
+ const details=new URLSearchParams([...form.entries()]);
+ details.set('id',ids.person);
+ details.set('full_name',data.person_name);
+ details.set('gender',data.person_gender||'unknown');
+ details.set('family_id',data.person_family_id||'');
+ details.set('birth_date',data.person_birth_date||'');
+ details.set('birth_place',data.person_birth_place||'');
+ details.set('father_id',ids.father||'');
+ details.set('mother_id',ids.mother||'');
+ details.set('identity',data.person_identity||'');
+ details.set('identifier_type',data.person_identity_kind||'national_id');
+ await changePerson(db,user,details);
  await journal(db,user,'genealogy_tree_created','people',ids.person,{recordsCreated:creations.length,hasFather:!!ids.father,hasMother:!!ids.mother,hasPaternalGrandparents:!!(ids.father_father||ids.father_mother),hasMaternalGrandparents:!!(ids.mother_father||ids.mother_mother)});
  return ids.person;
 }
@@ -182,7 +195,7 @@ async function updatePrivateDetails(db,user,form,personId){
  let last4=prior.rows[0]?.national_id_last4||null;
  if(remove){
    if(current.rows.some(row=>row.status==='verified'))throw new HttpError(409,'الهوية المعتمدة تتطلب طلب تصحيح ومراجعة قبل إلغائها');
-   await db.query("update public.person_identifiers set status='revoked' where person_id=$1 and status in ('pending','disputed')",[personId]);
+   await db.query("update public.person_identifiers set status='revoked',encrypted_value=null,masked_value=null where person_id=$1 and status in ('pending','disputed')",[personId]);
    idCipher=null;last4=null;
  }else if(identifier){
    const hashed=identity(identifier,kind);
@@ -191,7 +204,7 @@ async function updatePrivateDetails(db,user,form,personId){
    const matching=current.rows.find(row=>row.identifier_type===kind&&row.identifier_hmac.equals(hashed.digest));
    if(!matching){
      if(current.rows.some(row=>row.identifier_type===kind&&row.status==='verified'))throw new HttpError(409,'لا يمكن استبدال هوية معتمدة مباشرة؛ ارفع طلب تصحيح');
-     await db.query("update public.person_identifiers set status='revoked' where person_id=$1 and identifier_type=$2 and status in ('pending','disputed')",[personId,kind]);
+     await db.query("update public.person_identifiers set status='revoked',encrypted_value=null,masked_value=null where person_id=$1 and identifier_type=$2 and status in ('pending','disputed')",[personId,kind]);
      await db.query("insert into public.person_identifiers(person_id,country_code,issuer,identifier_type,identifier_hmac,hmac_key_version,masked_value,status,encrypted_value) values($1,'SA','admin-supplied',$2,$3,1,$4,'pending',$5)",[personId,kind,hashed.digest,'******'+hashed.last4,sealPrivate(identifier,personId,'identity:'+kind)]);
    }
    idCipher=sealPrivate(identifier,personId,'national_id');
