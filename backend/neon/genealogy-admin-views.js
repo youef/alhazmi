@@ -38,6 +38,31 @@ function tribeSelect(data,name='tribe_id',selected=''){
  const value=selected||data.tribes[0]?.id||'';
  return '<select name="'+e(name)+'" required>'+data.tribes.map(u=>'<option value="'+e(u.id)+'"'+(value===u.id?' selected':'')+'>'+e(u.name_ar)+'</option>').join('')+'</select>';
 }
+function creationExtras(){
+ const work=[['','— غير محددة —'],['employed','موظف'],['self_employed','عمل حر'],['unemployed','غير موظف'],['student','طالب'],['retired','متقاعد']]
+  .map(([v,title])=>'<option value="'+v+'">'+title+'</option>').join('');
+ return '<details class="gen-details gen-create-extras"><summary>05 · تفاصيل الفرد الخاصة (اختياري · حفظ مباشر)</summary>'+
+ '<p class="gen-muted">يمكن إدخال البيانات من الآن، وستحفظ مع الفرد في الملف الخاص المشفّر دون إظهارها في شجرة النسب العامة.</p>'+
+ '<div class="gen-form-grid">'+
+ input('phone','رقم الجوال','',32,'tel','autocomplete="off"')+
+ input('email','البريد الإلكتروني','',254,'email','autocomplete="off"')+
+ input('city','مدينة السكن','',100)+input('region','المنطقة','',100)+input('country','رمز الدولة','SA',2)+
+ input('address_short_code','العنوان الوطني المختصر','',12)+
+ input('address_building_number','رقم المبنى','',8,'text','inputmode="numeric"')+
+ input('address_street','الشارع','',160)+input('address_district','الحي','',130)+
+ input('address_postal_code','الرمز البريدي','',10,'text','inputmode="numeric"')+
+ input('address_additional_number','الرقم الإضافي','',10,'text','inputmode="numeric"')+
+ input('address_unit_number','رقم الوحدة','',20)+
+ wide('<label>تفاصيل العنوان<textarea name="address_address_details" maxlength="750" rows="2"></textarea></label>')+
+ '<label>الحالة الوظيفية<select name="employment_status">'+work+'</select></label>'+
+ input('education_level','المؤهل العلمي','',120)+input('employer','جهة العمل','',200)+
+ input('job_title','المسمى الوظيفي','',160)+
+ '<label>حالة الحياة<select name="living_status"><option value="unknown">غير محددة</option><option value="alive">حي</option><option value="deceased">متوفى</option></select></label>'+
+ '<label>تاريخ الوفاة (إن وجد)<input type="date" name="death_date"></label>'+
+ wide('<label>نبذة تعريفية<textarea name="biography" maxlength="4000" rows="3"></textarea></label>')+
+ wide('<label>ملاحظات داخلية مشفرة<textarea name="private_notes" maxlength="5000" rows="5"></textarea></label>')+
+ '</div></details>';
+}
 function personWizard(data,csrf){
  const fields='<div class="gen-bundle"><fieldset><legend>01 · الفرد الجديد</legend>'+
  '<div class="gen-form-grid"><label>الاسم الكامل *<input name="person_name" maxlength="200" minlength="3" required placeholder="الاسم الأول واسم الأب والجد"></label>'+
@@ -51,7 +76,7 @@ function personWizard(data,csrf){
  '<fieldset><legend>03 · الأجداد من جهة الأب</legend>'+
  relative(data,'father_father','جد الأب','ذكر')+relative(data,'father_mother','جدة الأب','أنثى')+'</fieldset>'+
  '<fieldset><legend>04 · الأجداد من جهة الأم</legend>'+
- relative(data,'mother_father','جد الأم','ذكر')+relative(data,'mother_mother','جدة الأم','أنثى')+'</fieldset>'+
+ relative(data,'mother_father','جد الأم','ذكر')+relative(data,'mother_mother','جدة الأم','أنثى')+'</fieldset>'+creationExtras()+
  '<div class="gen-note">جميع الأشخاص الجدد سجلات <b>خاصة وقيد المراجعة</b>. قد يُنشأ حتى ٧ أفراد في عملية واحدة؛ ولا يُنشر أي نسب في الدليل العام تلقائيًا.</div>'+
  '<label class="gen-check"><input name="confirm_reuse" type="checkbox" value="yes">أوافق على استخدام سجل موجود إذا تطابقت بصمة الهوية وراجعت اسم الشخص.</label>'+
  '<label class="gen-check"><input name="allow_duplicate_name" type="checkbox" value="yes">أتفهم وجود أسماء متشابهة وأوافق على إنشاء شخص مختلف بعد التحقق.</label></div>';
