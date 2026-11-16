@@ -10,7 +10,7 @@ import { memberAuth } from './member-auth.js';
 import { authPage, dashboard, memberHome, moduleNames, modulePage, page, profilePage, portalScript } from './member-views.js';
 
 const publicForms = new Set(['login', 'register', 'verify', 'forgot', 'reset']);
-const maxFormBytes = 32768; // Encrypted profile editor supports up to 5k characters of private notes.
+const maxFormBytes = 65536; // Bounded large private biography and notes fields; individual fields enforce strict lengths.
 const minute = 60;
 const inlineScriptHash = createHash('sha256').update(portalScript).digest('base64');
 
