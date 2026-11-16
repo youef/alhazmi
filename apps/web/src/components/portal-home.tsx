@@ -14,15 +14,21 @@ export function PortalHome({ locale }: { locale: Locale }) {
         <div className="banner-content">
           <p className="banner-kicker">{ar ? 'إرثٌ يجمعنا… ومستقبلٌ نكتبه' : 'Online portal'}</p>
           <h1 id="welcome-title">{t.brand}</h1>
-          <p>{ar ? 'تصفّح الأفخاذ والعوائل، واطّلع على الأنساب المعتمدة والموروث العائلي من مكان واحد.' : 'Browse families and branches, explore approved genealogy, and discover family heritage in one place.'}</p>
-          <a className="primary-button" href="#services">{ar ? 'تصفّح خدمات الديوان' : 'Browse services'}<Arrow aria-hidden="true" size={17} /></a>
+          <p>{t.welcomeBody}</p>
+          <a className="primary-button" href="#services">{t.browse}<Arrow aria-hidden="true" size={17} /></a>
         </div>
-
+        <div className="banner-art" aria-hidden="true">
+          <div className="banner-orbit orbit-outer"/>
+          <div className="banner-orbit orbit-inner"/>
+          <span className="banner-symbol banner-satellite satellite-book">📖</span>
+          <span className="banner-symbol banner-satellite satellite-file">📄</span>
+        </div>
       </section>
 
       <section id="services" className="portal-services" aria-labelledby="services-title">
         <div className="section-heading">
           <h2 id="services-title">{ar ? 'خدمات الديوان' : 'Diwan services'}</h2>
+          <p>{ar ? 'استكشف الأقسام الرئيسية للديوان: دليل الأفخاذ والعوائل، شجرة النسب المعتمدة، التاريخ والروايات، والأرشيف الوثائقي.' : 'Explore the diwan’s main sections: the family and branch directory, the approved genealogy tree, history and accounts, and the documentary archive.'}</p>
         </div>
         <SectionCards locale={locale} />
       </section>
@@ -33,7 +39,12 @@ export function PortalHome({ locale }: { locale: Locale }) {
       </section>
 
       <section className="heritage-strip" aria-label={ar ? 'هوية الديوان' : 'Our heritage'}>
-        <div><span className="heritage-label">{ar ? 'الأصالة والانتماء' : 'HERITAGE & BELONGING'}</span><h2>{ar ? 'جذور راسخة، وروابط لا تنقطع' : 'Deep roots. Lasting connections.'}</h2><p>{ar ? 'نحفظ موروثنا، ونجمع حكاياتنا، ونصل الأجيال بتاريخ عائلاتهم.' : 'Preserving our heritage and connecting generations through family stories.'}</p><Link href={`/${locale}/history/`}>{ar ? 'اكتشف تاريخ الديوان' : 'Explore our heritage'}<Arrow size={18} /></Link></div>
+        <div>
+          <span className="heritage-label">{ar ? 'الأصالة والانتماء' : 'HERITAGE & BELONGING'}</span>
+          <h2>{ar ? 'جذور راسخة، وروابط لا تنقطع' : 'Deep roots. Lasting connections.'}</h2>
+          <p>{ar ? 'نحفظ موروثنا، ونجمع حكاياتنا، ونصل الأجيال بتاريخ عائلاتهم.' : 'Preserving our heritage and connecting generations through family stories.'}</p>
+          <Link href={`/${locale}/history/`}>{ar ? 'اكتشف تاريخ الديوان' : 'Explore our heritage'}<Arrow size={18} /></Link>
+        </div>
       </section>
       <aside className="privacy-panel">
         <span className="privacy-icon"><ShieldCheck aria-hidden="true" size={23} /></span>

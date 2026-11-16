@@ -16,7 +16,7 @@ export function SectionHeader({ locale, section, title, description }: {
   return <header className="area-header">
     <nav aria-label={ar ? 'مسار الصفحة' : 'Breadcrumb'}>
       <Link href={`/${locale}/`}><House size={15} aria-hidden="true" />{t.nav.home}</Link>
-      <span aria-hidden="true">/</span><span aria-current="page">{t.nav[section]}</span>
+      <span aria-hidden="true">{ar ? ' › ' : '/'}</span><span aria-current="page">{t.nav[section]}</span>
     </nav>
     <div className="area-heading">
       <span className="area-icon"><Icon size={30} aria-hidden="true" /></span>

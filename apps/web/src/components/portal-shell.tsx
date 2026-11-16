@@ -23,7 +23,7 @@ export function PortalShell({ locale, children }: { locale: Locale; children: Re
     <footer className="footer">
       <div className="container footer-grid">
         <div className="footer-about">
-          <div className="footer-label"><Image unoptimized src={assetUrl('/brand/diwan-emblem.webp')} alt="" width="42" height="42" /><strong>{t.brand}</strong></div>
+          <div className="footer-label"><Image unoptimized src={assetUrl('/brand/diwan-emblem.webp')} alt="" width="44" height="44" /><strong>{t.brand}</strong></div>
           <p>{t.footer}</p>
           <p className="footer-note">{t.editorial}</p>
         </div>

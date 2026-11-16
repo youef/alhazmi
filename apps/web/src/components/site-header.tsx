@@ -60,7 +60,7 @@ export function SiteHeader({ locale }: { locale: Locale }) {
     </div></div>
     <div className="container header-inner">
       <Link className="brand" href={`/${locale}/`}>
-        <span className="brand-seal"><Image unoptimized src={assetUrl('/brand/diwan-emblem.webp')} alt="" width="56" height="56" /></span>
+        <span className="brand-seal"><Image unoptimized src={assetUrl('/brand/diwan-emblem.webp')} alt="" width="52" height="52" /></span>
         <span className="brand-name"><strong>{t.brand}</strong><small>{t.eyebrow}</small></span>
       </Link>
       <nav className="main-nav" aria-label={ar ? 'التنقل الرئيسي' : 'Main navigation'}>
