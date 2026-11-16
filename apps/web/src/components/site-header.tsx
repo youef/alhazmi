@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Archive, BookOpenText, GitBranch, Globe2, CircleUserRound, House, Moon, Sun, UsersRound } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
@@ -60,7 +61,7 @@ export function SiteHeader({ locale }: { locale: Locale }) {
     </div></div>
     <div className="container header-inner">
       <Link className="brand" href={`/${locale}/`}>
-        <span className="brand-seal"><GitBranch size={25} aria-hidden="true" /></span>
+        <span className="brand-seal"><Image unoptimized src="https://youef.github.io/alhazmi/brand/diwan-emblem.webp" alt="" width="56" height="56" /></span>
         <span className="brand-name"><strong>{t.brand}</strong><small>{t.eyebrow}</small></span>
       </Link>
       <nav className="main-nav" aria-label={ar ? 'التنقل الرئيسي' : 'Main navigation'}>

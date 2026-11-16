@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { GitBranch } from 'lucide-react';
+import Image from 'next/image';
 import { SiteHeader } from '@/components/site-header';
 import { direction, getDictionary, type Locale } from '@/lib/i18n';
 import type { ReactNode } from 'react';
@@ -13,7 +13,7 @@ export function PortalShell({ locale, children }: { locale: Locale; children: Re
     {children}
     <footer className="footer">
       <div className="container footer-inner">
-        <div className="footer-label"><GitBranch size={21} aria-hidden="true" /><span>{t.footer}</span></div>
+        <div className="footer-label"><Image unoptimized src="https://youef.github.io/alhazmi/brand/diwan-emblem.webp" alt="" width="42" height="42" /><span>{t.footer}</span></div>
         <nav aria-label={ar ? 'روابط التذييل' : 'Footer links'}>
           <Link href={`/${locale}/history/`}>{t.nav.history}</Link>
           <Link href={`/${locale}/archive/`}>{t.nav.archive}</Link>

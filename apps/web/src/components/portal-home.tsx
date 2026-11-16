@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowUpLeft, ArrowUpRight, BookOpenText, Files, GitBranch, ShieldCheck } from 'lucide-react';
+import { ArrowUpLeft, ArrowUpRight, ShieldCheck } from 'lucide-react';
 import { SectionCards } from '@/components/section-cards';
 import { getDictionary, type Locale } from '@/lib/i18n';
 
@@ -12,18 +12,12 @@ export function PortalHome({ locale }: { locale: Locale }) {
     <div className="container">
       <section className="portal-banner" aria-labelledby="welcome-title">
         <div className="banner-content">
-          <p className="banner-kicker">{ar ? 'البوابة الإلكترونية' : 'Online portal'}</p>
+          <p className="banner-kicker">{ar ? 'إرثٌ يجمعنا… ومستقبلٌ نكتبه' : 'Online portal'}</p>
           <h1 id="welcome-title">{t.brand}</h1>
           <p>{ar ? 'تصفّح الأفخاذ والعوائل، واطّلع على الأنساب المعتمدة والموروث العائلي من مكان واحد.' : 'Browse families and branches, explore approved genealogy, and discover family heritage in one place.'}</p>
           <a className="primary-button" href="#services">{ar ? 'تصفّح خدمات الديوان' : 'Browse services'}<Arrow aria-hidden="true" size={17} /></a>
         </div>
-        <div className="banner-art" aria-hidden="true">
-          <span className="banner-orbit orbit-outer" />
-          <span className="banner-orbit orbit-inner" />
-          <span className="banner-symbol"><GitBranch size={70} strokeWidth={1.35} /></span>
-          <span className="banner-satellite satellite-book"><BookOpenText size={24} /></span>
-          <span className="banner-satellite satellite-file"><Files size={24} /></span>
-        </div>
+
       </section>
 
       <section id="services" className="portal-services" aria-labelledby="services-title">
@@ -33,6 +27,9 @@ export function PortalHome({ locale }: { locale: Locale }) {
         <SectionCards locale={locale} />
       </section>
 
+      <section className="heritage-strip" aria-label={ar ? 'هوية الديوان' : 'Our heritage'}>
+        <div><span className="heritage-label">{ar ? 'الأصالة والانتماء' : 'HERITAGE & BELONGING'}</span><h2>{ar ? 'جذور راسخة، وروابط لا تنقطع' : 'Deep roots. Lasting connections.'}</h2><p>{ar ? 'نحفظ موروثنا، ونجمع حكاياتنا، ونصل الأجيال بتاريخ عائلاتهم.' : 'Preserving our heritage and connecting generations through family stories.'}</p><Link href={`/${locale}/history/`}>{ar ? 'اكتشف تاريخ الديوان' : 'Explore our heritage'}<Arrow size={18} /></Link></div>
+      </section>
       <aside className="privacy-panel">
         <span className="privacy-icon"><ShieldCheck aria-hidden="true" size={23} /></span>
         <div><h2>{ar ? 'الخصوصية والتوثيق' : 'Privacy and verification'}</h2><p>{t.privacy}</p></div>
