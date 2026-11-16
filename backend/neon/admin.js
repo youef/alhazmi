@@ -1,8 +1,9 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { authorized, HttpError, isId, pool } from './shared.js';
+import { genealogyAction, genealogyData } from './genealogy-admin.js';
 
-export const ADMIN_SECTIONS=['overview','kinship','members','requests','services','claims','roles','audit','system'];
+export const ADMIN_SECTIONS=['overview','genealogy','kinship','members','requests','services','claims','roles','audit','system'];
 const n=18;
 const clip=(v,max=100)=>typeof v==='string'?v.trim().slice(0,max):'';
 const guard=async(u,p='roles.view')=>{if(!await authorized(u,p))throw new HttpError(403,'Access denied');};
@@ -28,6 +29,7 @@ export async function adminData(u,section,url){
  const q=clip(url.searchParams.get('q'),80),status=clip(url.searchParams.get('status'),30);
  const rawPage=Number(url.searchParams.get('page')||1),page=Number.isSafeInteger(rawPage)&&rawPage>0?Math.min(rawPage,1000):1;
  const filter={q,status,page};
+ if(section==='genealogy')return {filter,data:await genealogyData(u,url)};
  if(section==='overview'){
   const metrics=await Promise.all([
    metric('select count(*) total from neon_auth."user" where banned is distinct from true'),
@@ -209,6 +211,10 @@ const OPERATIONS={
 export async function adminAction(u,section,req,form){
  await guard(u);
  verify(u,req,form.get('csrf'));
+ if(section==='genealogy'){
+  await genealogyAction(u,form);
+  return '/admin/genealogy?done=1';
+ }
  const op=clip(form.get('operation'),40),rule=OPERATIONS[op];
  if(!rule||rule[0]!==section)throw new HttpError(404,'Unknown action');
  await guard(u,rule[1]);

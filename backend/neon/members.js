@@ -5,6 +5,7 @@ import { ADMIN_SECTIONS, adminAction, adminData, csrfFor } from './admin.js';
 import { familyAction, familyAdminData, familySupervisorData } from './family-management.js';
 import { familyAdminView, familyMemberView } from './family-views.js';
 import { adminView } from './admin-views.js';
+import { genealogyIdentityLookup } from './genealogy-admin.js';
 import { memberAuth } from './member-auth.js';
 import { authPage, dashboard, memberHome, moduleNames, modulePage, page, profilePage, portalScript } from './member-views.js';
 
@@ -183,7 +184,14 @@ export default {
         const section = path === '/admin' ? 'overview' : path.slice('/admin/'.length);
         if (!ADMIN_SECTIONS.includes(section)) return html(page('الصفحة غير موجودة', '<p>القسم الإداري غير موجود.</p>', true), 404);
         if (request.method === 'POST') {
-          return redirect(headers, await adminAction(account, section, request, await readForm(request)));
+          const submitted=await readForm(request);
+          if(section==='genealogy' && submitted.get('operation')==='lookup_identity'){
+            const result=await genealogyIdentityLookup(account,request,submitted);
+            const {data,filter}=await adminData(account,section,url);
+            data.lookup=result;
+            return html(adminView(section,user,data,filter,csrfFor(account,request),false));
+          }
+          return redirect(headers, await adminAction(account, section, request, submitted));
         }
         const {data, filter} = await adminData(account, section, url);
         return html(adminView(section, user, data, filter, csrfFor(account, request), url.searchParams.get('done') === '1'));

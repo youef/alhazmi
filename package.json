@@ -13,7 +13,7 @@
     "lint": "npm run lint --workspace @alhazmi/web",
     "test": "npm run test --workspace @alhazmi/web",
     "functions:build": "node ./backend/neon/build.mjs",
-    "functions:check": "node --check backend/neon/api.js && node --check backend/neon/uploads.js && node --check backend/neon/shared.js && node --check backend/neon/members.js && node --check backend/neon/member-auth.js && node --check backend/neon/member-views.js && node --check backend/neon/family-management.js && node --check backend/neon/family-views.js && node --check backend/neon/family-finalization.js && node --check backend/neon/admin.js && node --check backend/neon/admin-views.js",
+    "functions:check": "node --check backend/neon/api.js && node --check backend/neon/uploads.js && node --check backend/neon/shared.js && node --check backend/neon/members.js && node --check backend/neon/member-auth.js && node --check backend/neon/member-views.js && node --check backend/neon/family-management.js && node --check backend/neon/family-views.js && node --check backend/neon/family-finalization.js && node --check backend/neon/admin.js && node --check backend/neon/admin-views.js && node --check backend/neon/genealogy-admin.js && node --check backend/neon/genealogy-admin-views.js && node --check backend/neon/genealogy-admin-style.js && node --check backend/neon/genealogy-rules.js",
     "check": "npm run functions:check && npm run functions:test",
     "build:functions": "node ./backend/neon/build.mjs",
     "functions:test": "node --test backend/neon/*.test.js"
