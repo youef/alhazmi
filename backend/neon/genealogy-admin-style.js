@@ -91,6 +91,12 @@ export const genealogyStyles=`
 .gen-action-group a:hover,.gen-compact-button:hover{background:#e9d3b6;transform:translateY(-1px)}
 @media(max-width:1050px){.gen-editor-layout{grid-template-columns:minmax(0,1fr)}.gen-editor-side{position:static;grid-template-columns:repeat(2,minmax(0,1fr))}.gen-side-panel{grid-column:1/-1}}
 @media(max-width:620px){.gen-editor-side{grid-template-columns:1fr}.gen-editor .gen-submit{width:100%}.gen-edit-fieldset{padding:13px}.gen-editor-layout{gap:13px}}
+.gen-create-extras[open]{border-color:#cba889;background:#fffaf4}
+.gen-create-extras>.gen-form-grid{margin-top:12px}
+.gen-create-extras .gen-form-grid .gen-full{grid-column:1/-1}
+.gen-create-extras textarea{width:100%;resize:vertical}
+.gen-editor .gen-edit-fieldset:nth-of-type(3){border-color:#d5dcba}
+.gen-shell :is(a,button,summary,input,select,textarea):focus-visible{outline:3px solid #a96545;outline-offset:2px}
 @media(max-width:1000px){.gen-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){
  .gen-grid,.gen-form-grid,.gen-relative,.gen-identity-row{grid-template-columns:1fr}
