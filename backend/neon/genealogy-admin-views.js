@@ -32,7 +32,13 @@ function unitSelect(data,selected='',blank='— دون أصل / فرع مستق�
  return '<select name="parent_id">'+options(units||data.directoryUnits||data.units,'id',u=>u.name_ar+' · '+(types[u.unit_type]||u.unit_type),selected,blank)+'</select>';
 }
 function familySelect(data,selected='',name='person_family_id'){
- return '<select name="'+e(name)+'">'+options((data.directoryUnits||data.units).filter(u=>['family','house'].includes(u.unit_type)),'id',u=>u.name_ar,selected,'— غير محدد —')+'</select>';
+ const all=data.directoryUnits||data.units, byId=new Map(all.map(item=>[item.id,item]));
+ const fakhth=unit=>{
+  let current=unit,depth=0;
+  while(current&&depth++<12){if(current.unit_type==='subclan')return current.name_ar;current=byId.get(current.parent_id);}
+  return '';
+ };
+ return '<select name="'+e(name)+'">'+options(all.filter(u=>['family','house'].includes(u.unit_type)),'id',u=>u.name_ar+(fakhth(u)?' · فخذ '+fakhth(u):''),selected,'— غير محدد —')+'</select>';
 }
 function tribeSelect(data,name='tribe_id',selected=''){
  const value=selected||data.tribes[0]?.id||'';
@@ -147,6 +153,7 @@ function relationEditor(data,csrf){
   '<label>نوع الهوية'+idKind('relative_identity_kind')+'</label>'+
   input('relative_identity','رقم الهوية أو الوثيقة','',50,'password','inputmode="numeric" autocomplete="off" placeholder="يستخدم للمطابقة أولًا"')+
   '<label>العائلة / البيت للقريب'+familySelect(data,'','relative_family_id')+'</label>'+
+  '<label>الزوج/الزوجة الآخر كوالد للابن (اختياري)<select name="co_parent_id">'+options(relations.spouses.filter(x=>['current','reported'].includes(x.marriage_status)),'id',x=>x.full_name_ar+' — '+(marriageLabels[x.marriage_status]||''),'','— بلا والد ثانٍ —')+'</select></label>'+
   '<label>تاريخ الميلاد<input type="date" name="relative_birth_date"></label>'+
   input('relative_birth_place','مكان الميلاد','',120)+
   '<label>حالة الحياة<select name="relative_living_status"><option value="unknown">غير معروف</option><option value="alive">حي</option><option value="deceased">متوفى</option></select></label>'+
