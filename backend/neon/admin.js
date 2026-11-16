@@ -213,7 +213,8 @@ export async function adminAction(u,section,req,form){
  verify(u,req,form.get('csrf'));
  if(section==='genealogy'){
   await genealogyAction(u,form);
-  return '/admin/genealogy?done=1';
+  const op=String(form.get('operation')||''),id=String(form.get('id')||'');
+  return op==='edit_person'&&isId(id)?'/admin/genealogy?person_id='+encodeURIComponent(id)+'&done=1#gen-person-edit':'/admin/genealogy?done=1';
  }
  const op=clip(form.get('operation'),40),rule=OPERATIONS[op];
  if(!rule||rule[0]!==section)throw new HttpError(404,'Unknown action');
