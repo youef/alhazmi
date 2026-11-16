@@ -306,3 +306,38 @@ button { cursor: pointer; }
   background: var(--canvas);
 }
 .unit-tree .tree-toggle .tree-chevron { margin-inline-start: auto; }
+
+
+/* Diwan 2026 — Hail-inspired warm editorial visual system */
+.site-root{--surface:#fffdfa;--canvas:#f5f1eb;--text:#39291d;--muted:#8b7665;--line:#e6dcd0;--soft:#f3e6d7;--accent:#a75439;--accent-hover:#8c422c;--gold:#bd925b;--banner:#30251c;--shadow:0 12px 36px #49312013;background:var(--canvas)}
+:root[data-theme="dark"] .site-root{--surface:#30251f;--canvas:#211a16;--text:#fff5e9;--muted:#d3bca7;--line:#5c4537;--soft:#493226;--accent:#e5a27c;--accent-hover:#f0b58f;--shadow:0 12px 36px #0004}
+.site-header{background:#30251c;color:#fff7ed;border:0;box-shadow:0 5px 20px #29190f25}
+.site-header:before{height:3px;background:linear-gradient(90deg,#bc8053,#f1d4a0,#a75439)}
+.utility-bar{background:#a55339;color:#fff}
+.utility-inner{min-height:40px}.utility-action{border-radius:8px;color:#fff9ed}
+.header-inner{max-width:1480px}
+.brand-name strong{color:#fff8ec}.brand-name small{color:#dbc2a8}.brand-seal{background:linear-gradient(140deg,#b66d45,#6e4029);color:#fff;border:1px solid #f0d5b64d}
+.main-nav a{color:#e6d6c7;border-bottom-color:transparent}.main-nav a:hover,.main-nav a[aria-current="page"]{background:#a55339;color:#fff;border-radius:10px 10px 0 0}.main-nav a[aria-current="page"]{border-bottom-color:#d8b47c}
+.portal-main{padding-top:0}
+.portal-main>.container{max-width:1480px}
+.portal-banner{min-height:clamp(440px,60vw,635px);padding:clamp(30px,7vw,92px);align-items:end!important;border-radius:0 0 27px 27px;background:linear-gradient(90deg,#24180fec 0%,#51321db8 48%,#8b4c3180 100%),radial-gradient(ellipse at 77% 25%,#d5955c 0%,#75513d 46%,#30241c 100%);box-shadow:0 22px 48px #42261928}
+.portal-banner:before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse at 70% 20%,#ffc78642,transparent 48%),repeating-linear-gradient(155deg,transparent 0 110px,#f1d09c0c 111px 113px);pointer-events:none}
+.portal-banner:after{content:"";position:absolute;inset:auto -3% 0;height:95px;background:linear-gradient(145deg,transparent 10%,#bd8557a6 11% 26%,transparent 27% 31%,#291e18 32% 76%,#a45c36 77%);clip-path:polygon(0 100%,0 78%,18% 74%,34% 36%,44% 72%,60% 8%,78% 68%,93% 22%,100% 49%,100% 100%);opacity:.8;pointer-events:none}
+.banner-content{padding-bottom:65px;max-width:720px}.banner-kicker{color:#eac79a;text-transform:uppercase;letter-spacing:.075em}
+.banner-content h1{font-size:clamp(2.6rem,6vw,5rem);line-height:1.18;color:#fff7ec;text-shadow:0 5px 24px #1d120b77}
+.banner-content p:not(.banner-kicker){color:#f6e4d1;line-height:1.95}
+.primary-button{background:#a95339;color:#fff;border-radius:11px;box-shadow:0 12px 25px #23140833}.primary-button:hover{background:#c26b49}
+.banner-art{display:grid;min-height:300px;opacity:.95}
+.banner-orbit{border-color:#eed1a264}.banner-symbol{border:2px solid #f7dbac9c;border-radius:50%;width:170px;height:170px;color:#f9deb1;background:#f6dfb21b;backdrop-filter:blur(8px)}
+.banner-satellite{background:#b583523d;color:#fff2d9;border-color:#e8cc9b67}
+.portal-services{padding-block:55px 35px}.section-heading h2{font-size:clamp(1.7rem,3.5vw,2.4rem);color:var(--text)}
+.section-card{background:var(--surface);border:1px solid var(--line);border-radius:21px;box-shadow:var(--shadow);min-height:215px;padding:24px}
+.section-card:hover{border-color:#bb8467;box-shadow:0 18px 40px #57311e22}
+.card-icon,.privacy-icon,.directory-icon,.area-icon{background:#f3e4d2;color:#a55339;border-radius:13px}
+.card-arrow,.privacy-panel a,.text-link,.inner-eyebrow,.area-header nav a{color:var(--accent)}
+.privacy-panel,.area-header,.coming-card,.collection-panel,.directory-item,.unit-tree summary,.tree-leaf,.unit-tree .tree-toggle{box-shadow:var(--shadow);background:var(--surface)}
+.footer{background:#2e241b;color:#efe1d1;border-top:4px solid #b8784b}
+.pill,.unit-tag{background:var(--soft);color:var(--accent)}
+.directory-policy{background:var(--soft);color:var(--text)}
+@media(min-width:820px){.portal-banner{grid-template-columns:minmax(0,1.15fr) minmax(240px,.7fr)}}
+@media(max-width:819px){.portal-banner{min-height:470px;padding:30px 24px}.banner-content{padding-bottom:66px}.banner-art{display:none}.site-header{position:relative}}
