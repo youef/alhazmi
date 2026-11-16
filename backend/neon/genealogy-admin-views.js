@@ -27,10 +27,10 @@ function relative(data,role,label,genderAr){
  '<small>إذا أدخلت هوية موجودة، يستلزم استخدامها موافقتك على إعادة ربط السجل المطابق، ولا يتم إنشاء نسخة أخرى.</small></details>';
 }
 function unitSelect(data,selected='',blank='— دون أصل / فرع مستقل —',units=null){
- return '<select name="parent_id">'+options(units||data.units,'id',u=>u.name_ar+' · '+(types[u.unit_type]||u.unit_type),selected,blank)+'</select>';
+ return '<select name="parent_id">'+options(units||data.directoryUnits||data.units,'id',u=>u.name_ar+' · '+(types[u.unit_type]||u.unit_type),selected,blank)+'</select>';
 }
 function familySelect(data,selected='',name='person_family_id'){
- return '<select name="'+e(name)+'">'+options(data.units.filter(u=>['family','house'].includes(u.unit_type)),'id',u=>u.name_ar,selected,'— غير محدد —')+'</select>';
+ return '<select name="'+e(name)+'">'+options((data.directoryUnits||data.units).filter(u=>['family','house'].includes(u.unit_type)),'id',u=>u.name_ar,selected,'— غير محدد —')+'</select>';
 }
 function tribeSelect(data,name='tribe_id',selected=''){
  const value=selected||data.tribes[0]?.id||'';
@@ -55,58 +55,74 @@ function personWizard(data,csrf){
  '<label class="gen-check"><input name="allow_duplicate_name" type="checkbox" value="yes">أتفهم وجود أسماء متشابهة وأوافق على إنشاء شخص مختلف بعد التحقق.</label></div>';
  return form('create_tree',csrf,fields,'حفظ الفرد وشجرة أصوله');
 }
-function personRows(data,csrf){
+function personRows(data){
  if(!data.people.length)return '<p class="gen-muted">لا توجد نتائج مطابقة. ابحث باسم آخر أو أضف فردًا جديدًا.</p>';
- return '<div class="gen-scroll"><table class="gen-table"><thead><tr><th>الشخص</th><th>العائلة والأصول</th><th>الحالة</th><th>تعديل / أرشفة</th></tr></thead><tbody>'+
+ return '<div class="gen-scroll"><table class="gen-table"><thead><tr><th>الشخص</th><th>العائلة والأصول</th><th>الحالة</th><th>الإدارة</th></tr></thead><tbody>'+
  data.people.map(p=>{
   const father=data.directory.find(x=>x.id===p.father_id)?.full_name_ar||'—';
   const mother=data.directory.find(x=>x.id===p.mother_id)?.full_name_ar||'—';
-  let editable='';
-  if(data.canEditPeople){
-   const edit=form('edit_person',csrf,h('id',p.id)+'<div class="gen-form-grid">'+
-     '<label>الاسم الكامل<input name="full_name" required maxlength="200" value="'+e(p.full_name_ar)+'"></label>'+
-     '<label>الجنس'+genderSelect(p.gender)+'</label>'+
-     '<label>العائلة'+familySelect(data,p.family_unit_id,'family_id')+'</label>'+
-     '<label>مكان الميلاد<input name="birth_place" maxlength="120" value="'+e(p.birth_place||'')+'"></label>'+
-     '<label>الأب'+selectParents(data,'father',p.father_id)+'</label>'+
-     '<label>الأم'+selectParents(data,'mother',p.mother_id)+'</label></div>'+
-     '<label>نبذة محفوظة داخليًا<textarea name="biography" maxlength="1000">'+e(p.biography||'')+'</textarea></label>'+
-     '<p class="gen-muted">حفظ التعديل يعيد السجل للمراجعة. لا يمكن إزالة أب أو أم مسجلين من دون إجراء تصحيح مستقل.</p>',
-     'حفظ التعديل');
-   const archive=form(p.record_status==='archived'?'restore_person':'archive_person',csrf,h('id',p.id)+'<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>أؤكد '+(p.record_status==='archived'?'استرجاع':'أرشفة')+' سجل الفرد</label>',p.record_status==='archived'?'استعادة للمراجعة':'أرشفة السجل');
-   const remove=form('delete_person_draft',csrf,h('id',p.id)+'<p class="gen-muted">الحذف متاح للمسودات غير المرتبطة فقط، ويحفظ النظام السجلات المرتبطة بالأبناء.</p><label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>أؤكد حذف هذه المسودة نهائيًا إن كانت غير مرتبطة</label>','حذف مسودة غير مرتبطة');
-   editable='<div class="gen-action-group"><details class="gen-details"><summary>تعديل الفرد</summary>'+edit+'</details>'+
-     '<details class="gen-details"><summary>'+(p.record_status==='archived'?'استعادة':'أرشفة')+'</summary>'+archive+'</details>'+
-     '<details class="gen-details"><summary>حذف المسودة</summary>'+remove+'</details></div>';
-  }
+  const url='/admin/genealogy?person_id='+encodeURIComponent(p.id)+'#gen-person-edit';
   return '<tr><td><strong>'+e(p.full_name_ar)+'</strong><br><small class="gen-small">'+e(gender[p.gender]||'')+' · '+e(p.identity_mask||'لا توجد هوية')+'</small></td>'+
-   '<td>'+e(p.family_name||'عائلة غير محددة')+'<br><small class="gen-small">الأب: '+e(father)+'<br>الأم: '+e(mother)+'</small></td>'+
-   '<td><span class="gen-pill '+(p.record_status==='verified'?'private':'')+'">'+e(status[p.record_status]||p.record_status)+'</span></td><td>'+editable+'</td></tr>';
+    '<td>'+e(p.family_name||'عائلة غير محددة')+'<br><small class="gen-small">الأب: '+e(father)+'<br>الأم: '+e(mother)+'</small></td>'+
+    '<td><span class="gen-pill">'+e(status[p.record_status]||p.record_status)+'</span></td>'+
+    '<td><a class="gen-compact-button" href="'+e(url)+'">فتح محرر الفرد</a></td></tr>';
  }).join('')+'</tbody></table></div>';
 }
-function unitRows(data,csrf){
- const visible=data.units.filter(u=>u.name_ar.toLocaleLowerCase('ar').includes(data.unitQ.toLocaleLowerCase('ar'))).slice(0,400);
+function editPersonCard(data,csrf){
+ const p=data.focusedPerson;
+ if(!p||!data.canEditPeople)return '';
+ const edit=form('edit_person',csrf,h('id',p.id)+'<div class="gen-form-grid">'+
+  '<label>الاسم الكامل<input name="full_name" required maxlength="200" value="'+e(p.full_name_ar)+'"></label>'+
+  '<label>الجنس'+genderSelect(p.gender)+'</label>'+
+  '<label>العائلة'+familySelect(data,p.family_unit_id,'family_id')+'</label>'+
+  '<label>مكان الميلاد<input name="birth_place" maxlength="120" value="'+e(p.birth_place||'')+'"></label>'+
+  '<label>الأب'+selectParents(data,'father',p.father_id)+'</label>'+
+  '<label>الأم'+selectParents(data,'mother',p.mother_id)+'</label></div>'+
+  '<label>نبذة محفوظة داخليًا<textarea name="biography" maxlength="1000">'+e(p.biography||'')+'</textarea></label>'+
+  '<p class="gen-muted">حفظ التعديل يعيد السجل للمراجعة. لا يمكن إزالة أب أو أم مسجلين من دون طلب تصحيح مستقل.</p>',
+  'حفظ التعديل');
+ const archive=form(p.record_status==='archived'?'restore_person':'archive_person',csrf,h('id',p.id)+
+  '<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>أؤكد '+(p.record_status==='archived'?'استعادة':'أرشفة')+' سجل الفرد</label>',
+  p.record_status==='archived'?'استعادة للمراجعة':'أرشفة السجل');
+ const remove=form('delete_person_draft',csrf,h('id',p.id)+
+  '<p class="gen-muted">الحذف متاح فقط للمسودات الخاصة غير المرتبطة بالأبناء أو حسابات أعضاء.</p>'+
+  '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>أؤكد حذف المسودة غير المرتبطة نهائيًا</label>',
+  'حذف المسودة');
+ return '<section class="gen-section" id="gen-person-edit"><div class="gen-section-head"><div><h2>تعديل سجل: '+e(p.full_name_ar)+'</h2>'+
+   '<small>محرر فرد واحد لمنع بطء الصفحة — جميع الحقول خاصة</small></div><a href="/admin/genealogy" class="gen-compact-button">إغلاق المحرر</a></div>'+
+   '<div class="gen-form-grid"><div>'+edit+'</div><div class="gen-bundle">'+
+   '<details class="gen-details"><summary>أرشفة / استعادة السجل</summary>'+archive+'</details>'+
+   '<details class="gen-details"><summary>حذف المسودة (عند عدم الارتباط فقط)</summary>'+remove+'</details></div></div></section>';
+}
+function unitRows(data){
+ const visible=data.units.slice(0,450);
  if(!visible.length)return '<p class="gen-muted">لا توجد وحدات نسب في هذا البحث.</p>';
- return '<div class="gen-scroll"><table class="gen-table"><thead><tr><th>وحدة النسب</th><th>النوع</th><th>حالة النشر</th><th>إجراءات</th></tr></thead><tbody>'+
+ return '<div class="gen-scroll"><table class="gen-table"><thead><tr><th>وحدة النسب</th><th>النوع</th><th>حالة النشر</th><th>الإدارة</th></tr></thead><tbody>'+
  visible.map(unit=>{
-  let actions='';
-  if(data.canEditUnits){
-   const update=form('edit_unit',csrf,h('id',unit.id)+
-     '<label>اسم الوحدة<input name="name" maxlength="150" value="'+e(unit.name_ar)+'" required></label>'+
-     '<label>الأصل'+unitSelect(data,unit.parent_id)+'</label>'+
-     '<p class="gen-muted">التعديل يعيد الوحدة إلى قائمة المراجعة. تغيير أصل وحدة فيها أبناء يتطلب إجراء إعادة هيكلة مستقلًا.</p>','حفظ تعديل الوحدة');
-   const withdraw=form('withdraw_unit',csrf,h('id',unit.id)+
-     '<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>أؤكد إيقاف عرض هذه الوحدة للمراجعة</label>','إيقاف النشر');
-   const remove=form('delete_unit_draft',csrf,h('id',unit.id)+
-     '<p class="gen-muted">يمكن حذف وحدة أُنشئت يدويًا ولم تُعتمد بعد فقط، بشرط خلوّها من أفراد أو فروع مرتبطة.</p>'+
-     '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>تأكيد حذف مسودة الوحدة</label>','حذف المسودة');
-   actions='<div class="gen-action-group"><details class="gen-details"><summary>تعديل</summary>'+update+'</details>'+
-      '<details class="gen-details"><summary>إيقاف النشر</summary>'+withdraw+'</details>'+
-      '<details class="gen-details"><summary>حذف مسودة</summary>'+remove+'</details></div>';
-  }
+  const url='/admin/genealogy?unit_id='+encodeURIComponent(unit.id)+'#gen-unit-edit';
   return '<tr><td>'+e(unit.name_ar)+'</td><td>'+e(types[unit.unit_type]||unit.unit_type)+'</td>'+
-   '<td><span class="gen-pill">'+e(status[unit.review_status]||unit.review_status||'بلا مراجعة')+'</span></td><td>'+actions+'</td></tr>';
+   '<td><span class="gen-pill">'+e(status[unit.review_status]||unit.review_status||'بلا مراجعة')+'</span></td>'+
+   '<td><a class="gen-compact-button" href="'+e(url)+'">فتح محرر الوحدة</a></td></tr>';
  }).join('')+'</tbody></table></div>';
+}
+function editUnitCard(data,csrf){
+ const unit=data.focusedUnit;
+ if(!unit||!data.canEditUnits)return '';
+ const update=form('edit_unit',csrf,h('id',unit.id)+
+   '<label>اسم الوحدة<input name="name" maxlength="150" value="'+e(unit.name_ar)+'" required></label>'+
+   '<label>الأصل'+unitSelect(data,unit.parent_id,'— دون أصل —',data.directoryUnits)+'</label>'+
+   '<p class="gen-muted">يعود كل تعديل إلى قائمة المراجعة. نقل وحدة تحتوي أبناء غير مسموح مباشرة.</p>',
+   'حفظ تعديل الوحدة');
+ const withdraw=form('withdraw_unit',csrf,h('id',unit.id)+
+   '<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>أؤكد إيقاف عرض هذه الوحدة حتى اكتمال المراجعة</label>','إيقاف النشر');
+ const remove=form('delete_unit_draft',csrf,h('id',unit.id)+
+   '<p class="gen-muted">الحذف متاح للسجلات اليدوية الجديدة غير المعتمدة والخالية من أي روابط.</p>'+
+   '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>تأكيد حذف وحدة مسودة</label>','حذف المسودة');
+ return '<section class="gen-section" id="gen-unit-edit"><div class="gen-section-head"><div><h2>تعديل وحدة النسب: '+e(unit.name_ar)+'</h2><small>تعديل المسمى والتسلسل مع سجل تدقيق</small></div>'+
+   '<a class="gen-compact-button" href="/admin/genealogy">إغلاق المحرر</a></div>'+
+   '<div class="gen-form-grid"><div>'+update+'</div><div class="gen-bundle">'+
+   '<details class="gen-details"><summary>إيقاف النشر للمراجعة</summary>'+withdraw+'</details>'+
+   '<details class="gen-details"><summary>حذف مسودة الوحدة</summary>'+remove+'</details></div></div></section>';
 }
 export function genealogyView(data,csrf){
  const metrics=[
@@ -138,10 +154,10 @@ export function genealogyView(data,csrf){
   '<section class="gen-section"><div class="gen-section-head"><div><h2>دليل الأفراد والتعديل والأرشفة</h2><small>بحث الاسم يعرض سجلات خاصة للإدارة فقط</small></div></div>'+
    '<form method="get" action="/admin/genealogy" class="gen-search"><label>اسم الفرد<input type="search" maxlength="70" name="q" value="'+e(data.q)+'" placeholder="ابحث عن اسم أو لقب"></label>'+h('unit_q',data.unitQ)+
     '<button type="submit">بحث</button><a class="gen-compact-button" href="/admin/genealogy">مسح</a></form>'+
-   personRows(data,csrf)+'</section>'+
+   personRows(data)+'</section>'+editPersonCard(data,csrf)+
   '<section class="gen-section"><div class="gen-section-head"><div class="gen-section-header"><span class="gen-section-icon">♧</span><div><h2>إدارة الأفخاذ والعوائل</h2><small>إضافة وتعديل وربط الوحدات بالترتيب الأبوي الصحيح</small></div></div>'+
    '<a class="gen-compact-button" href="https://youef.github.io/alhazmi/ar/lineage/" target="_blank" rel="noopener noreferrer">معاينة الدليل العام</a></div>'+
    (data.canEditUnits?'<details class="gen-details"><summary>＋ إضافة فخذ أو عائلة أو بيت جديد</summary>'+unitForm+'</details>':'<p class="gen-muted">إنشاء الوحدات يحتاج صلاحية إدارة هيكلة النسب.</p>')+
    '<form method="get" action="/admin/genealogy" class="gen-search">'+h('q',data.q)+'<label>اسم الفخذ أو العائلة<input name="unit_q" type="search" maxlength="70" value="'+e(data.unitQ)+'" placeholder="تصفية وحدات النسب"></label><button type="submit">تصفية</button></form>'+
-   unitRows(data,csrf)+'</section></div>';
+   unitRows(data)+'</section>'+editUnitCard(data,csrf)+'</div>';
 }
