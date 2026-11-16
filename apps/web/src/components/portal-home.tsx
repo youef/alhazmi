@@ -27,6 +27,11 @@ export function PortalHome({ locale }: { locale: Locale }) {
         <SectionCards locale={locale} />
       </section>
 
+      <section className="approval-steps" aria-labelledby="steps-title">
+        <h2 id="steps-title">{t.stepsTitle}</h2>
+        <ol>{t.steps.map((step, index) => <li key={step.title}><span className="step-number" aria-hidden="true">{index + 1}</span><div><h3>{step.title}</h3><p>{step.body}</p></div></li>)}</ol>
+      </section>
+
       <section className="heritage-strip" aria-label={ar ? 'هوية الديوان' : 'Our heritage'}>
         <div><span className="heritage-label">{ar ? 'الأصالة والانتماء' : 'HERITAGE & BELONGING'}</span><h2>{ar ? 'جذور راسخة، وروابط لا تنقطع' : 'Deep roots. Lasting connections.'}</h2><p>{ar ? 'نحفظ موروثنا، ونجمع حكاياتنا، ونصل الأجيال بتاريخ عائلاتهم.' : 'Preserving our heritage and connecting generations through family stories.'}</p><Link href={`/${locale}/history/`}>{ar ? 'اكتشف تاريخ الديوان' : 'Explore our heritage'}<Arrow size={18} /></Link></div>
       </section>

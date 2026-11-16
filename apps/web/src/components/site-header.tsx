@@ -6,8 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Archive, BookOpenText, GitBranch, Globe2, CircleUserRound, House, Moon, Sun, UsersRound } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { getDictionary, type Locale } from '@/lib/i18n';
-
-const memberDashboard = 'https://br-flat-boat-azy2ouq3-diwanmembers.compute.c-3.ap-southeast-1.aws.neon.tech/dashboard';
+import { assetUrl, memberPortalUrl } from '@/lib/site';
 const themeEvent = 'diwan-theme';
 function subscribe(listener: () => void) {
   const preference = window.matchMedia('(prefers-color-scheme: dark)');
@@ -50,7 +49,7 @@ export function SiteHeader({ locale }: { locale: Locale }) {
     <div className="utility-bar"><div className="container utility-inner">
       <span>{ar ? 'مبادرة أهلية مستقلة' : 'Independent community initiative'}</span>
       <div className="header-actions">
-        <a className="utility-action" href={memberDashboard}><CircleUserRound size={17} aria-hidden="true" />{ar ? 'حسابي' : 'My account'}</a>
+        <a className="utility-action" href={memberPortalUrl}><CircleUserRound size={17} aria-hidden="true" />{ar ? 'حسابي' : 'My account'}</a>
         <Link className="utility-action" href={`/${nextLocale}${suffix}/`} hrefLang={nextLocale} lang={nextLocale}>
           <Globe2 size={17} aria-hidden="true" />{ar ? 'English' : 'العربية'}
         </Link>
@@ -61,7 +60,7 @@ export function SiteHeader({ locale }: { locale: Locale }) {
     </div></div>
     <div className="container header-inner">
       <Link className="brand" href={`/${locale}/`}>
-        <span className="brand-seal"><Image unoptimized src="https://youef.github.io/alhazmi/brand/diwan-emblem.webp" alt="" width="56" height="56" /></span>
+        <span className="brand-seal"><Image unoptimized src={assetUrl('/brand/diwan-emblem.webp')} alt="" width="56" height="56" /></span>
         <span className="brand-name"><strong>{t.brand}</strong><small>{t.eyebrow}</small></span>
       </Link>
       <nav className="main-nav" aria-label={ar ? 'التنقل الرئيسي' : 'Main navigation'}>

@@ -3,3 +3,5 @@ Allow: /
 Disallow: /api/
 Disallow: /admin/
 Disallow: /dashboard/
+
+Sitemap: https://youef.github.io/alhazmi/sitemap.xml
