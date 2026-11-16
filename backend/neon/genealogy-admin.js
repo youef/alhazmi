@@ -323,13 +323,14 @@ export async function genealogyData(user,url){
  const peopleSQL="select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.birth_place,p.biography,p.created_at,l.name_ar as family_name,"+
   "(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) as identity_mask "+
   "from public.people p left join public.lineage_units l on l.id=p.family_unit_id where ($1='' or position(lower($1) in lower(p.full_name_ar))>0) order by p.created_at desc limit 120";
- const [tribes,people,units,sources,stats]=await Promise.all([
+ const [tribes,people,units,sources,stats,directory]=await Promise.all([
   pool.query('select id,name_ar from public.tribes order by name_ar limit 40'),
   pool.query(peopleSQL,[q]),
   pool.query("select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,r.review_status from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id where ($1='' or position(lower($1) in lower(l.name_ar))>0) order by l.name_ar limit 550",[unitQ]),
   pool.query('select id,tribe_id,title,source_type from public.sources order by created_at desc limit 60'),
-  pool.query("select (select count(*) from public.people) people,(select count(*) from public.people where record_status='under_review') drafts,(select count(*) from public.lineage_units) units,(select count(*) from public.lineage_seed_reviews where review_status='needs_review') unit_reviews")
+  pool.query("select (select count(*) from public.people) people,(select count(*) from public.people where record_status='under_review') drafts,(select count(*) from public.lineage_units) units,(select count(*) from public.lineage_seed_reviews where review_status='needs_review') unit_reviews"),
+  pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) identity_mask from public.people p where p.record_status<>'archived' order by p.full_name_ar limit 400")
  ]);
  const permissions=await Promise.all(['identity.edit','lineage.structure_apply'].map(key=>authorized(user,key)));
- return {tribes:tribes.rows,people:people.rows,units:units.rows,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
+ return {tribes:tribes.rows,people:people.rows,directory:directory.rows,units:units.rows,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
 }
