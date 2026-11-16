@@ -103,6 +103,87 @@ const dateValue=value=>{
 const input=(name,title,value='',max=160,type='text',other='')=>
  '<label>'+e(title)+'<input name="'+e(name)+'" type="'+e(type)+'" maxlength="'+max+'" value="'+e(value??'')+'" '+other+'></label>';
 const wide=(html)=>'<div class="gen-full">'+html+'</div>';
+
+const relationRoles={
+ spouse:'زوج / زوجة',child:'ابن / ابنة',father:'الأب',mother:'الأم',
+ father_father:'الجد من الأب',father_mother:'الجدة من الأب',
+ mother_father:'الجد من الأم',mother_mother:'الجدة من الأم'
+};
+const marriageLabels={reported:'زواج مُبلّغ عنه · ينتظر التوثيق',current:'زواج قائم',ended:'زواج منتهٍ',disputed:'زواج يحتاج مراجعة',void:'علاقة ملغاة'};
+const editLink=p=>'/admin/genealogy?person_id='+encodeURIComponent(p.id)+'#gen-person-edit';
+function personLink(p,extra=''){
+ if(!p)return '<span class="gen-rel-unknown">غير مسجّل</span>';
+ return '<article class="gen-relation-person"><div><strong>'+e(p.full_name_ar)+'</strong><small>'+
+ e(p.family_name||'العائلة غير محددة')+' · '+e(status[p.record_status]||p.record_status||'تحت المراجعة')+
+ (extra?' · '+e(extra):'')+'</small></div>'+
+ '<a href="'+e(editLink(p))+'" class="gen-compact-button">عرض وتعديل السجل</a></article>';
+}
+function relationEditor(data,csrf){
+ const p=data.focusedPerson;if(!p||!data.canEditPeople)return '';
+ const relations=data.relations||{ancestors:[],spouses:[],children:[]};
+ const byId=new Map(relations.ancestors.map(r=>[r.id,r]));
+ const father=byId.get(p.father_id),mother=byId.get(p.mother_id);
+ const isMarried=relations.spouses.some(s=>['reported','current','disputed'].includes(s.marriage_status));
+ const familyGroup=(title,records)=>'<div class="gen-rel-group"><h4>'+e(title)+'</h4>'+records.map(x=>personLink(x)).join('')+'</div>';
+ const ancestors='<div class="gen-rel-grid">'+
+ familyGroup('الأب والأم',[father,mother])+
+ familyGroup('أجداد الأب',[father&&byId.get(father.father_id),father&&byId.get(father.mother_id)])+
+ familyGroup('أجداد الأم',[mother&&byId.get(mother.father_id),mother&&byId.get(mother.mother_id)])+'</div>';
+ const spouses=relations.spouses.length?relations.spouses.map(x=>personLink(x,marriageLabels[x.marriage_status]||x.marriage_status)).join(''):
+ '<p class="gen-muted">لا توجد علاقة زواج مسجلة في الداتا حتى الآن.</p>';
+ const children=relations.children.length?relations.children.map(x=>personLink(x,e(x.gender==='male'?'ابن':x.gender==='female'?'ابنة':'فرد'))).join(''):
+ '<p class="gen-muted">لا يوجد أبناء مسجلون تحت هذا الشخص.</p>';
+ const roles=Object.entries(relationRoles).map(([key,label])=>'<option value="'+key+'">'+e(label)+'</option>').join('');
+ const genderOpts='<option value="unknown">غير محدد</option><option value="male">ذكر</option><option value="female">أنثى</option>';
+ const add=form('add_relation',csrf,
+  h('person_id',p.id)+
+  '<div class="gen-form-grid">'+
+  '<label>صلة القرابة المطلوب إضافتها *<select name="relation_role" required>'+roles+'</select></label>'+
+  '<label>شخص موجود في سجلات الديوان'+
+   '<select name="relative_id" aria-label="اختيار قريب موجود">'+options(data.directory,'id',r=>r.full_name_ar+' · '+(r.identity_mask||'بلا هوية'),'','— ابحث بالاسم في القائمة أو أدخل الهوية —')+'</select></label>'+
+  wide('<p class="gen-muted">إن كانت الهوية مسجلة، يجري فحص بصمتها تلقائيًا عند الحفظ، وتُستخدم بيانات السجل الموجود بدل إنشاء مكرر بعد تأكيدك. وإذا كانت غير موجودة، يُنشأ ملف خاص للقريب مع علاقة تحت المراجعة.</p>')+
+  '<label>اسم القريب الكامل'+input('relative_name','الاسم (عند عدم اختيار سجل سابق)','',200,'text','autocomplete="off"')+'</label>'+
+  '<label>جنس القريب الجديد<select name="relative_gender">'+genderOpts+'</select></label>'+
+  '<label>نوع الهوية'+idKind('relative_identity_kind')+'</label>'+
+  input('relative_identity','رقم الهوية أو الوثيقة','',50,'password','inputmode="numeric" autocomplete="off" placeholder="يستخدم للمطابقة أولًا"')+
+  '<label>العائلة / البيت للقريب'+familySelect(data,'','relative_family_id')+'</label>'+
+  '<label>تاريخ الميلاد<input type="date" name="relative_birth_date"></label>'+
+  input('relative_birth_place','مكان الميلاد','',120)+
+  '<label>حالة الحياة<select name="relative_living_status"><option value="unknown">غير معروف</option><option value="alive">حي</option><option value="deceased">متوفى</option></select></label>'+
+  wide('<label class="gen-check"><input type="checkbox" name="confirm_reuse" value="yes">أوافق على ربط سجل مسجل مسبقًا عند تطابق رقم هويته واسمه</label>')+
+  '</div>'+
+  '<details class="gen-details"><summary>تفاصيل إضافية للقريب الجديد · اختياري</summary><div class="gen-form-grid">'+
+   input('relative_phone','الجوال','',32,'tel')+
+   input('relative_email','البريد الإلكتروني','',254,'email')+
+   input('relative_city','مدينة السكن','',100)+input('relative_region','المنطقة','',100)+
+   input('relative_country','رمز الدولة','SA',2)+
+   input('relative_address_short_code','العنوان المختصر','',12)+
+   input('relative_address_street','الشارع','',160)+
+   input('relative_address_district','الحي','',130)+
+   input('relative_address_building_number','رقم المبنى','',8,'text','inputmode="numeric"')+
+   input('relative_address_postal_code','الرمز البريدي','',10,'text','inputmode="numeric"')+
+   input('relative_address_additional_number','الرقم الإضافي','',10,'text','inputmode="numeric"')+
+   input('relative_address_unit_number','رقم الوحدة','',20)+
+   input('relative_education_level','المؤهل العلمي','',120)+
+   input('relative_employer','جهة العمل','',200)+
+   input('relative_job_title','المسمى الوظيفي','',160)+
+   '<label>الحالة الوظيفية<select name="relative_employment_status"><option value="">— غير محدد —</option><option value="employed">موظف</option><option value="retired">متقاعد</option><option value="student">طالب</option><option value="self_employed">عمل حر</option><option value="unemployed">غير موظف</option></select></label>'+
+   wide('<label>تفاصيل إضافية عن العنوان<textarea name="relative_address_address_details" maxlength="750" rows="2"></textarea></label>')+
+   wide('<label>ملاحظات خاصة<textarea name="relative_private_notes" maxlength="5000" rows="4"></textarea></label>')+
+   '</div></details>'+
+   '<p class="gen-muted">للأب والأجداد الذكور من جهة النسب الأبوي، يمكن اقتراح العائلة المسجلة تلقائيًا عند عدم اختيار عائلة أخرى. الأم والزوجة وعائلاتهن لا تُستنتج من اسم الزوج.</p>',
+   'فحص الهوية وحفظ صلة القرابة');
+ const currentMarriage=isMarried?'<div class="gen-rel-tabs"><h3>الزوجات / الأزواج المسجلون</h3>'+spouses+'<h3>الأبناء والبنات</h3>'+children+'</div>':
+ '<div class="gen-rel-tabs"><h3>الأب والأم والأجداد</h3>'+ancestors+'</div>';
+ const secondary=isMarried?'<details class="gen-details gen-rel-ancestors"><summary>عرض الأب والأم وأجداد الطرفين</summary>'+ancestors+'</details>':
+ relations.children.length?'<details class="gen-details"><summary>الأبناء الموجودون في السجل</summary>'+children+'</details>':'';
+ return '<section class="gen-relation-panel"><div class="gen-section-head"><div><h3>العائلة والأصول والنسل</h3>'+
+ '<small>'+(isMarried?'تُعرض الزيجات والأبناء المرتبطون بهذا السجل':'لا توجد زيجات مسجلة · يُعرض تسلسل الأب والأم والأجداد')+'</small></div>'+
+ '<span class="gen-pill">'+e(relations.children.length)+' أبناء · '+e(relations.spouses.length)+' زواج</span></div>'+
+ currentMarriage+secondary+
+ '<details class="gen-details gen-relation-add"><summary>＋ إضافة زوج / ابن / أب / أم / جد أو جدة وربطه بالهوية</summary>'+
+ add+'</details></section>';
+}
 function editPersonCard(data,csrf){
  const p=data.focusedPerson;
  if(!p||!data.canEditPeople)return '';
@@ -170,7 +251,7 @@ function editPersonCard(data,csrf){
   '<div class="gen-section-head"><div><span class="gen-editor-eyebrow">السجل الشخصي · تفاصيل الإدارة</span><h2>تعديل سجل: '+e(p.full_name_ar)+'</h2>'+
   '<small>محرر متكامل لفرد واحد للحفاظ على الأداء · البيانات الحساسة خاصة ومشفّرة</small></div>'+
   '<a href="/admin/genealogy" class="gen-compact-button">إغلاق المحرر</a></div>'+
-  '<div class="gen-editor-layout"><div class="gen-editor-main">'+edit+'</div>'+
+  '<div class="gen-editor-layout"><div class="gen-editor-main">'+relationEditor(data,csrf)+edit+'</div>'+
   '<aside class="gen-editor-side"><div class="gen-side-panel"><h3>حالة السجل</h3><span class="gen-pill">'+e(status[p.record_status]||p.record_status)+'</span>'+
   '<p class="gen-muted">ترتبط بيانات الأنساب بمراجعة موثقة. لا يؤدي تغيير البيانات الخاصة إلى نشرها للعامة.</p></div>'+
   '<details class="gen-details"><summary>أرشفة / استعادة السجل</summary>'+archive+'</details>'+
