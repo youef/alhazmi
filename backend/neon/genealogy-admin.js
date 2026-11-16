@@ -535,6 +535,13 @@ export async function genealogyData(user,url){
   focusUnitId?pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units where id=$1 limit 1',[focusUnitId]):Promise.resolve({rows:[]})
  ]);
  const permissions=await Promise.all(['identity.edit','lineage.structure_apply'].map(key=>authorized(user,key)));
+ // Fetch only one focused person's family graph, never all genealogy profiles.
+ const [ancestors,spouses,children]=focusPerson.rows[0]&&permissions[0]?await Promise.all([
+  pool.query("with relatives as (select father_id id from public.people where id=$1 union select mother_id from public.people where id=$1 union select gp.father_id from public.people child join public.people gp on gp.id in (child.father_id,child.mother_id) where child.id=$1 union select gp.mother_id from public.people child join public.people gp on gp.id in (child.father_id,child.mother_id) where child.id=$1) select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.father_id,p.mother_id,f.name_ar family_name from public.people p left join public.lineage_units f on f.id=p.family_unit_id where p.id in (select id from relatives) limit 12",[focusPersonId]),
+  pool.query("select m.id marriage_id,m.status marriage_status,m.start_date,m.end_date,p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,f.name_ar family_name from public.marriages m join public.people p on p.id=case when m.partner_a_id=$1 then m.partner_b_id else m.partner_a_id end left join public.lineage_units f on f.id=p.family_unit_id where m.partner_a_id=$1 or m.partner_b_id=$1 order by m.created_at desc limit 50",[focusPersonId]),
+  pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.father_id,p.mother_id,f.name_ar family_name from public.people p left join public.lineage_units f on f.id=p.family_unit_id where p.father_id=$1 or p.mother_id=$1 order by p.birth_date nulls last,p.full_name_ar limit 160",[focusPersonId])
+ ]):[{rows:[]},{rows:[]},{rows:[]}];
+
  const focused=focusPerson.rows[0]||null;
  if(focused&&permissions[0]){
    for(const [column,name] of PRIVATE_INPUTS)
@@ -545,5 +552,5 @@ export async function genealogyData(user,url){
  if(focused){
    for(const key of ['national_id_ciphertext','phone_ciphertext','email_ciphertext','national_address_ciphertext','employer_ciphertext','job_title_ciphertext','private_notes_ciphertext'])delete focused[key];
  }
- return {tribes:tribes.rows,people:people.rows,directory:directory.rows,childOf:directory.rows.find(p=>p.id===childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows,focusedPerson:focused,focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
+ return {tribes:tribes.rows,people:people.rows,directory:directory.rows,childOf:directory.rows.find(p=>p.id===childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows,focusedPerson:focused,relations:{ancestors:ancestors.rows,spouses:spouses.rows,children:children.rows},focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
 }
