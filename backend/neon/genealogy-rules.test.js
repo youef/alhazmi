@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { fingerprintIdentity, canonicalName, relativePlan, assertDistinctParents, cleanName } from './genealogy-rules.js';
 
