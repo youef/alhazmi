@@ -156,3 +156,82 @@
   .site-root .hazm-history .hh-caution{background:#382f21;color:#e8d8af;border-color:#685a3c}
 }
 @media(prefers-reduced-motion:reduce){.hazm-history *{scroll-behavior:auto!important;transition:none!important}}
+
+
+/* 2026 Diwan design parity: history is part of the same heritage portal. */
+.site-root .hazm-history{
+  --hh-forest:#6f422b;--hh-deep:#30251c;--hh-gold:#c49a64;
+  --hh-paper:var(--surface);--hh-border:var(--line);
+  --hh-ink:var(--text);--hh-quiet:var(--muted);
+}
+.site-root .hazm-history .hh-breadcrumb{margin-bottom:22px;font-weight:650}
+.site-root .hazm-history .hh-breadcrumb a{color:var(--accent)}
+.site-root .hazm-history .hh-hero{
+  display:flex;align-items:center;min-height:570px;padding:clamp(28px,5vw,65px);
+  border:1px solid #b8946f;border-radius:22px;
+  background:linear-gradient(90deg,#25180c24 0%,#25180c9e 48%,#25180ce8 100%),var(--hero-image) center/cover no-repeat;
+  box-shadow:0 18px 46px #3a21151d;
+}
+.site-root[dir=ltr] .hazm-history .hh-hero{
+  background-image:linear-gradient(270deg,#25180c24 0%,#25180c9e 48%,#25180ce8 100%),var(--hero-image);
+}
+.site-root .hazm-history .hh-hero::before,.site-root .hazm-history .hh-hero::after,
+.site-root .hazm-history .hh-hero-pattern,.site-root .hazm-history .hh-hero-emblem{display:none}
+.site-root .hazm-history .hh-hero-body{max-width:690px}
+.site-root .hazm-history .hh-kicker{background:#30251c70;border:1px solid #e4bc86;color:#f9ddae}
+.site-root .hazm-history .hh-hero h1{font-size:clamp(2.5rem,5vw,4.65rem);font-weight:850;line-height:1.35;letter-spacing:0;color:#fff6e9}
+.site-root .hazm-history .hh-hero h1 em{color:#efcd98}
+.site-root .hazm-history .hh-hero h1 small{color:#f2ddbf}
+.site-root .hazm-history .hh-hero-body>p{color:#fff0db;font-size:clamp(.96rem,1.65vw,1.1rem);line-height:2}
+.site-root .hazm-history .hh-hero-tags span{background:#30251ca6;color:#fff2dc;border-color:#e6c69e80}
+.site-root .hazm-history .hh-hero-tags svg{color:#f0c995}
+.site-root .hazm-history .hh-cta{background:#d9b17a;color:#2b1c12;border:1px solid #efd1a3;border-radius:11px;min-height:48px}
+.site-root .hazm-history .hh-cta:hover{background:#f1cd99}
+.site-root .hazm-history .hh-cta-outline{background:#30251c70;color:#fff4e1;border-color:#dfbb89}
+.site-root .hazm-history .hh-facts{gap:15px;margin:21px 0 34px}
+.site-root .hazm-history .hh-facts>div,
+.site-root .hazm-history .hh-paper,
+.site-root .hazm-history .hh-division{border-radius:18px;border:1px solid var(--line);border-top:3px solid #c59a67;background:var(--surface);box-shadow:0 10px 30px #3d24100c}
+.site-root .hazm-history .hh-facts>div{min-height:104px;padding:17px}
+.site-root .hazm-history .hh-facts>div>span,
+.site-root .hazm-history .hh-paper-icon,
+.site-root .hazm-history .hh-note-icon{background:#f3e6d7;color:#a55339;border:1px solid #dfc7aa}
+.site-root .hazm-history .hh-facts>div:first-child>span{background:#f3e6d7;color:#a55339}
+.site-root .hazm-history .hh-index{border-radius:16px;padding:13px;background:var(--surface);border:1px solid var(--line)}
+.site-root .hazm-history .hh-index a{border-radius:10px;font-size:.83rem;min-height:44px}
+.site-root .hazm-history .hh-index a:hover{background:var(--soft);color:var(--accent)}
+.site-root .hazm-history .hh-index span,
+.site-root .hazm-history .hh-eyebrow{color:#ad704a}
+.site-root .hazm-history .hh-heading{border-bottom:1px solid var(--line);padding-bottom:17px}
+.site-root .hazm-history .hh-heading h2{font-size:clamp(1.55rem,3vw,2.15rem);letter-spacing:0}
+.site-root .hazm-history .hh-section{margin-bottom:58px}
+.site-root .hazm-history .hh-lineage-panel{background:linear-gradient(125deg,#30251c,#65412e);border:1px solid #be9569;color:#fff6e7;border-radius:18px}
+.site-root .hazm-history .hh-lineage-panel p{color:#f3dcc3}
+.site-root .hazm-history .hh-lineage-step.is-last{background:#d9b17a;color:#332218}
+.site-root .hazm-history .hh-division-badge{background:#f3e6d7;color:#945136}
+.site-root .hazm-history .hh-highlight-note{background:var(--soft);border-color:#dfc7aa}
+.site-root .hazm-history .hh-story-main{background:var(--surface);border:1px solid var(--line);border-top:3px solid #c59a67;border-radius:18px;color:var(--text)}
+.site-root .hazm-history .hh-story-main>p{color:var(--muted)}
+.site-root .hazm-history .hh-clan-list>span{background:var(--canvas);border-color:var(--line)}
+.site-root .hazm-history .hh-cite,.site-root .hazm-history .hh-section-actions a{color:var(--accent)}
+@media(max-width:900px){
+ .site-root .hazm-history .hh-hero{min-height:530px}
+ .site-root .hazm-history .hh-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+ .site-root .hazm-history .hh-hero{min-height:570px;align-items:flex-end;padding:28px 21px;background-image:linear-gradient(0deg,#24170bf5,#24170bb7 45%,transparent 88%),var(--hero-image);background-position:30% center}
+ .site-root .hazm-history .hh-hero-body{width:100%}
+ .site-root .hazm-history .hh-hero h1{font-size:clamp(2.15rem,9vw,2.9rem)}
+ .site-root .hazm-history .hh-hero-tags{gap:6px}
+ .site-root .hazm-history .hh-hero-tags span{font-size:.69rem}
+ .site-root .hazm-history .hh-hero-buttons{flex-direction:column;align-items:stretch}
+ .site-root .hazm-history .hh-facts{gap:9px}
+ .site-root .hazm-history .hh-facts>div{min-height:91px;padding:11px}
+ .site-root .hazm-history .hh-facts strong{font-size:.8rem}
+ .site-root .hazm-history .hh-index{margin-bottom:34px}
+ .site-root .hazm-history .hh-section{margin-bottom:40px}
+}
+@media(prefers-reduced-motion:reduce){
+ .site-root .hazm-history .hh-cta{transition:none}
+ .site-root .hazm-history .hh-cta:hover{transform:none}
+}
