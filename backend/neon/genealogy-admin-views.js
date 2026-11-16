@@ -142,7 +142,7 @@ function relationEditor(data,csrf){
   '<label>شخص موجود في سجلات الديوان'+
    '<select name="relative_id" aria-label="اختيار قريب موجود">'+options(data.directory,'id',r=>r.full_name_ar+' · '+(r.identity_mask||'بلا هوية'),'','— ابحث بالاسم في القائمة أو أدخل الهوية —')+'</select></label>'+
   wide('<p class="gen-muted">إن كانت الهوية مسجلة، يجري فحص بصمتها تلقائيًا عند الحفظ، وتُستخدم بيانات السجل الموجود بدل إنشاء مكرر بعد تأكيدك. وإذا كانت غير موجودة، يُنشأ ملف خاص للقريب مع علاقة تحت المراجعة.</p>')+
-  '<label>اسم القريب الكامل'+input('relative_name','الاسم (عند عدم اختيار سجل سابق)','',200,'text','autocomplete="off"')+'</label>'+
+  input('relative_name','الاسم الكامل للقريب (عند عدم اختيار سجل سابق)','',200,'text','autocomplete="off"')+
   '<label>جنس القريب الجديد<select name="relative_gender">'+genderOpts+'</select></label>'+
   '<label>نوع الهوية'+idKind('relative_identity_kind')+'</label>'+
   input('relative_identity','رقم الهوية أو الوثيقة','',50,'password','inputmode="numeric" autocomplete="off" placeholder="يستخدم للمطابقة أولًا"')+
