@@ -114,7 +114,7 @@ async function candidate(db,role,data,tribeId,user,{isMain=false}={}) {
  const fullName=requiredName(name);
  const gender=isMain?(data.person_gender||'unknown'):(RELATIVE_ROLES[role]?.gender||'unknown');
  if(!['male','female','unknown','undisclosed'].includes(gender))throw new HttpError(400,'الجنس غير صالح');
- if(!isMain) {
+ {
   const dup=await db.query("select id from public.people where tribe_id=$1 and (normalized_name=$2 or lower(full_name_ar)=lower($3)) and gender=$4 and record_status<>'archived' limit 1",[tribeId,canonicalName(fullName),fullName,gender]);
   if(dup.rowCount && data.allow_duplicate_name!=='yes')throw new HttpError(409,'اسم مشابه مسجل؛ ابحث عن الشخص وحدده بدل إضافته مرة ثانية، أو أكد تشابه الأسماء');
  }
@@ -173,6 +173,8 @@ async function archivePerson(db,user,form,restore=false){
   const r=await db.query("update public.people set record_status='under_review',visibility='private',updated_at=now() where id=$1 and record_status='archived' returning id",[id]);
   if(!r.rowCount)throw new HttpError(409,'ليس سجلًا مؤرشفًا');
  }else{
+  const attached=await db.query('select 1 from public.user_profiles where person_id=$1 limit 1',[id]);
+  if(attached.rowCount)throw new HttpError(409,'السجل مرتبط بحساب عضو؛ يلزم فصل الحساب ومراجعته قبل الأرشفة');
   const r=await db.query("update public.people set record_status='archived',visibility='private',updated_at=now() where id=$1 and record_status<>'archived' returning id",[id]);
   if(!r.rowCount)throw new HttpError(409,'السجل مؤرشف مسبقًا');
  }
@@ -253,6 +255,8 @@ async function changeUnit(db,user,form){
  if(match.rowCount)throw new HttpError(409,'يوجد اسم مطابق في هذه العائلة');
  await db.query('update public.lineage_units set name_ar=$2,normalized_name=$3,parent_id=$4 where id=$1',[id,name,canonicalName(name),parent]);
  await db.query("update public.lineage_seed_reviews set review_status='needs_review',verified_at=null,verified_by=null,reviewer_note=$2 where unit_id=$1",[id,'تعديل إداري يحتاج إعادة اعتماد']);
+ await db.query("update public.lineage_fakhths set review_status='needs_review',verified_at=null,verified_by=null where unit_id=$1",[id]);
+ await db.query("update public.lineage_family_fakhth_links set review_status='needs_review',verified_at=null,verified_by=null where family_unit_id=$1",[id]);
  await journal(db,user,'genealogy_unit_updated','lineage_units',id,{parentChanged:parent!==current.parent_id,needsReview:true});
 }
 async function withdrawUnit(db,user,form){
@@ -309,6 +313,8 @@ export async function genealogyIdentityLookup(user,req,form){
  const kind=field(form,'identifier_type',30);
  const raw=field(form,'identity',50);
  const hash=identity(raw,kind);
+ const recent=await pool.query("select count(*)::int as total from public.permission_audit_events where actor_user_id=$1 and event_type='genealogy_identity_lookup' and created_at > now() - interval '1 minute'",[user.id]);
+ if(Number(recent.rows[0]?.total||0)>=12)throw new HttpError(429,'تجاوزت الحد الآمن لطلبات مطابقة الهوية؛ حاول بعد دقيقة');
  const r=await pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,pi.masked_value from public.person_identifiers pi join public.people p on p.id=pi.person_id where pi.identifier_type=$1 and pi.identifier_hmac=$2 and pi.status in ('pending','verified','disputed') limit 1",[kind,hash.digest]);
  const found=r.rows[0]||null;
  const db=await pool.connect();
