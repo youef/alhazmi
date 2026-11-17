@@ -18,7 +18,7 @@ function headersForPage() {
   return new Headers({
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store, private',
-    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${inlineScriptHash}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline' https://youef.github.io/alhazmi/brand/; img-src https://youef.github.io/alhazmi/brand/; script-src 'sha256-${inlineScriptHash}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
     'X-Content-Type-Options': 'nosniff',
     // HTML form submissions need a non-opaque Origin for the CSRF check.
     'Referrer-Policy': 'same-origin',

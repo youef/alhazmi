@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
+import { dashboard } from './member-views.js';
 import members from './members.js';
 import { pool } from './shared.js';
 
@@ -160,4 +162,24 @@ test('remember me forwards the preference and preserves secure session cookie at
     assert.match(sessionCookie, /SameSite=Lax/i);
     assert.equal(/max-age=604800/i.test(sessionCookie), remember);
   }
+});
+
+test('member pages authorize the exact inline portal script and approved brand assets', async () => {
+  const response = await members.fetch(new Request(origin + '/login'));
+  const source = (await response.text()).match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(source);
+  const hash = createHash('sha256').update(source).digest('base64');
+  const policy = response.headers.get('content-security-policy');
+  assert.ok(policy.includes("script-src 'sha256-" + hash + "';"));
+  assert.ok(policy.includes('img-src https://youef.github.io/alhazmi/brand/;'));
+});
+
+test('service categories and search only include accessible dashboard modules', () => {
+  const html = dashboard(user, ['profile', 'notifications'], 'نشط');
+  assert.match(html, /href="\/dashboard\/profile"/);
+  assert.match(html, /href="\/dashboard\/notifications"/);
+  assert.match(html, /data-service-category="membership"/);
+  assert.doesNotMatch(html, /data-service-category="system"/);
+  assert.doesNotMatch(html, /href="\/dashboard\/audit"/);
+  assert.doesNotMatch(html, /href="\/admin\/genealogy"/);
 });

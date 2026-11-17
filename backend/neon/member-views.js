@@ -111,6 +111,35 @@ button,.action-link{background:#a55339;border-radius:10px;color:white}button:hov
 input,select,textarea{background:#fffefa;color:var(--text);border:1px solid var(--line);border-radius:10px}
 input:focus,select:focus,textarea:focus{outline:2px solid #c78d5f;outline-offset:1px}
 .tile-icon,.overview .value{color:#a55339}.tile-icon{background:#f5e6d6}.alert{background:#f5e6d6}
+body.diwan-services{
+ --surface:#fff;--canvas:#f3f7f4;--text:#18372a;--muted:#50695b;--line:#dce9e1;
+}
+.diwan-services>header{background:#fff;color:#163b2a;border-bottom:1px solid var(--line)}
+.diwan-services>header:before{display:none}
+.diwan-services>header nav a,.diwan-services>header nav .brand{color:#174c34}
+.diwan-services .brand-mark{border-color:var(--line);background:#fff}
+.diwan-services .diwan-public-utility{
+ display:flex;align-items:center;justify-content:space-between;gap:10px;
+ padding:8px max(20px,calc((100vw - 1210px)/2));background:#06432e;color:#fff;font-size:.77rem;
+}
+.diwan-services .diwan-public-utility a{color:inherit;text-underline-offset:3px}
+
+.diwan-services .service-dashboard{display:grid;gap:20px}
+.diwan-services .service-dashboard .member-hero{background:linear-gradient(120deg,#06432e,#086c47);border-color:#08704b;min-height:0}
+.diwan-services .service-dashboard .member-hero:after{display:none}
+.diwan-services .service-dashboard .member-hero p{color:#e0f3e8}
+.diwan-services .service-dashboard .member-hero .action-link{background:#fff;color:#075138}
+.diwan-services .service-dashboard .tile-icon{background:#e5f3ea;color:#086846}
+.diwan-services .service-dashboard .tile:hover{border-color:#78ae92}
+.diwan-services .service-dashboard .overview{margin:0}
+.service-filters{display:grid;gap:12px;padding:16px;background:#fff;border:1px solid var(--line);border-radius:14px}
+.service-filters .search-field{width:100%;max-width:none}
+.service-categories{display:flex;flex-wrap:wrap;gap:8px}
+.service-categories button{background:#edf5ef;color:#075138;border:1px solid var(--line)}
+.service-categories button[aria-pressed=true],.service-categories button:hover,.service-reset{background:#086846;color:#fff}
+.service-filter-status,.service-no-results{margin:0;color:var(--muted);font-size:.87rem}
+.service-no-results{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:18px}
+.diwan-services .service-dashboard :is(a,button,input):focus-visible{outline:3px solid #08754e;outline-offset:3px}
 `;
 
 export function escapeHtml(value) {
@@ -118,10 +147,64 @@ export function escapeHtml(value) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
 const e = escapeHtml;
-export const portalScript = "document.addEventListener('DOMContentLoaded',()=>{const search=document.getElementById('section-search');if(!search)return;const cards=[...document.querySelectorAll('[data-module-group] .tile')];const empty=document.getElementById('search-empty');search.addEventListener('input',()=>{const q=search.value.trim().toLocaleLowerCase('ar');let total=0;cards.forEach(card=>{const show=card.textContent.toLocaleLowerCase('ar').includes(q);card.hidden=!show;if(show)total++});document.querySelectorAll('[data-module-group]').forEach(group=>{group.hidden=![...group.querySelectorAll('.tile')].some(card=>!card.hidden)});empty.style.display=total?'none':'block'})});\n\ndocument.addEventListener('DOMContentLoaded',()=>{\n const fakhth=document.querySelector('select[name=\"fakhth\"]');\n const family=document.querySelector('select[name=\"family\"]');\n const parent=document.querySelector('select[name=\"parent\"]');\n const role=document.querySelector('select[name=\"role\"]');\n if(fakhth&&family){\n  const syncParent=()=>{\n   if(!parent)return;\n   Array.from(parent.options).forEach(opt=>{\n    if(!opt.value)return;\n    const okay=!family.value||opt.dataset.family===family.value;\n    opt.hidden=!okay;opt.disabled=!okay;\n   });\n   if(parent.selectedOptions[0]?.disabled)parent.value='';\n  };\n  const sync=()=>{\n   Array.from(family.options).forEach(opt=>{\n    if(!opt.value)return;\n    const okay=!fakhth.value||opt.dataset.fakhth===fakhth.value;\n    opt.hidden=!okay;opt.disabled=!okay;\n   });\n   if(family.selectedOptions[0]?.disabled)family.value='';\n   syncParent();\n  };\n  fakhth.addEventListener('change',sync);\n  family.addEventListener('change',syncParent);\n  if(role){\n   const roleSync=()=>{\n    const fam=role.value!=='diwan_fakhth_supervisor';\n    const par=role.value==='diwan_parent_supervisor';\n    family.required=fam;\n    if(parent)parent.required=par;\n    if(parent?.closest('label'))parent.closest('label').hidden=!par;\n    if(family.closest('label'))family.closest('label').hidden=!fam;\n   };\n   role.addEventListener('change',roleSync);roleSync();\n  }\n  sync();\n }\n const relationship=document.querySelector('select[name=\"relationship\"]');\n const gender=document.querySelector('select[name=\"gender\"]');\n if(relationship&&gender){\n  relationship.addEventListener('change',()=>{\n   if(['son','grandson'].includes(relationship.value))gender.value='male';\n   if(['daughter','granddaughter'].includes(relationship.value))gender.value='female';\n  });\n }\n});";
-export function page(title, content, signedIn = false, { administration = false } = {}) {
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${e(title)} | ديوان الحازمي</title><style>${css}</style>${administration ? '' : '<link rel="stylesheet" href="https://youef.github.io/alhazmi/brand/portal-heritage.css?v=5">'}</head>
-<body${administration ? ' class="diwan-administration"' : ''}><header><div class="diwan-public-utility"><span>مبادرة أهلية مستقلة</span><a href="https://youef.github.io/alhazmi/ar/">الموقع العام</a></div><nav aria-label="التنقل"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><img src="https://youef.github.io/alhazmi/brand/diwan-emblem.webp" alt="" width="48" height="48"></span><span>ديوان الحازمي</span></a><a href="/">الرئيسية</a><a href="${publicSite}">الموقع العام</a>
+function wireServiceFilters() {
+  const search = document.getElementById('section-search');
+  if (!search) return;
+
+  const normalize = value => value.normalize('NFKC').toLocaleLowerCase('ar')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').trim();
+  const buttons = [...document.querySelectorAll('[data-service-category]')];
+  const sections = [...document.querySelectorAll('[data-module-group]')].map(section => ({
+    section,
+    cards: [...section.querySelectorAll('.tile')].map(card => ({
+      card, text: normalize(card.dataset.serviceSearch),
+    })),
+  }));
+  const status = document.getElementById('service-filter-status');
+  const empty = document.getElementById('search-empty');
+  const number = new Intl.NumberFormat('ar-SA');
+  let category = 'all';
+
+  function update() {
+    const query = normalize(search.value).split(/\s+/).filter(Boolean);
+    let visible = 0;
+    for (const { section, cards } of sections) {
+      const inCategory = category === 'all' || section.dataset.moduleGroup === category;
+      let matches = 0;
+      for (const { card, text } of cards) {
+        card.hidden = !inCategory || !query.every(word => text.includes(word));
+        if (!card.hidden) matches++;
+      }
+      section.hidden = matches === 0;
+      section.querySelector('[data-group-count]').textContent = number.format(matches);
+      visible += matches;
+    }
+    status.textContent = 'الخدمات المعروضة: ' + number.format(visible);
+    empty.hidden = visible !== 0;
+    buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.serviceCategory === category)));
+  }
+
+  buttons.forEach(button => button.addEventListener('click', () => {
+    category = button.dataset.serviceCategory;
+    update();
+  }));
+  search.addEventListener('input', update);
+  document.getElementById('reset-service-filters').addEventListener('click', () => {
+    category = 'all';
+    search.value = '';
+    update();
+    search.focus();
+  });
+  document.querySelector('.service-filters').hidden = false;
+  update();
+}
+
+export const portalScript = "document.addEventListener('DOMContentLoaded'," + wireServiceFilters.toString() + ");\n" +
+ "document.addEventListener('DOMContentLoaded',()=>{\n const fakhth=document.querySelector('select[name=\"fakhth\"]');\n const family=document.querySelector('select[name=\"family\"]');\n const parent=document.querySelector('select[name=\"parent\"]');\n const role=document.querySelector('select[name=\"role\"]');\n if(fakhth&&family){\n  const syncParent=()=>{\n   if(!parent)return;\n   Array.from(parent.options).forEach(opt=>{\n    if(!opt.value)return;\n    const okay=!family.value||opt.dataset.family===family.value;\n    opt.hidden=!okay;opt.disabled=!okay;\n   });\n   if(parent.selectedOptions[0]?.disabled)parent.value='';\n  };\n  const sync=()=>{\n   Array.from(family.options).forEach(opt=>{\n    if(!opt.value)return;\n    const okay=!fakhth.value||opt.dataset.fakhth===fakhth.value;\n    opt.hidden=!okay;opt.disabled=!okay;\n   });\n   if(family.selectedOptions[0]?.disabled)family.value='';\n   syncParent();\n  };\n  fakhth.addEventListener('change',sync);\n  family.addEventListener('change',syncParent);\n  if(role){\n   const roleSync=()=>{\n    const fam=role.value!=='diwan_fakhth_supervisor';\n    const par=role.value==='diwan_parent_supervisor';\n    family.required=fam;\n    if(parent)parent.required=par;\n    if(parent?.closest('label'))parent.closest('label').hidden=!par;\n    if(family.closest('label'))family.closest('label').hidden=!fam;\n   };\n   role.addEventListener('change',roleSync);roleSync();\n  }\n  sync();\n }\n const relationship=document.querySelector('select[name=\"relationship\"]');\n const gender=document.querySelector('select[name=\"gender\"]');\n if(relationship&&gender){\n  relationship.addEventListener('change',()=>{\n   if(['son','grandson'].includes(relationship.value))gender.value='male';\n   if(['daughter','granddaughter'].includes(relationship.value))gender.value='female';\n  });\n }\n});";
+export function page(title, content, signedIn = false, { serviceLayout = false } = {}) {
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${e(title)} | ديوان الحازمي</title><style>${css}</style>${serviceLayout ? '' : '<link rel="stylesheet" href="https://youef.github.io/alhazmi/brand/portal-heritage.css?v=5">'}</head>
+<body${serviceLayout ? ' class="diwan-services"' : ''}><header><div class="diwan-public-utility"><span>مبادرة أهلية مستقلة</span><a href="https://youef.github.io/alhazmi/ar/">الموقع العام</a></div><nav aria-label="التنقل"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><img src="https://youef.github.io/alhazmi/brand/diwan-emblem.webp" alt="" width="48" height="48"></span><span>ديوان الحازمي</span></a><a href="/">الرئيسية</a><a href="${publicSite}">الموقع العام</a>
 ${signedIn ? '<a href="/dashboard">لوحة التحكم</a><a href="/profile">الملف الشخصي</a><form method="post" action="/logout"><button type="submit">تسجيل الخروج</button></form>' : '<a href="/login">تسجيل الدخول</a>'}</nav></header>
 <main>${content}</main><script>${portalScript}</script></body></html>`;
 }
@@ -137,9 +220,9 @@ export const moduleNames = {
   audit: 'سجل التدقيق', backups: 'حالة النسخ الاحتياطية',
 };
 const groups = [
-  ['الأعضاء والأسرة', ['profile','tree','family','familyTimeline','familySpaces','requests','serviceRequests','services','documents','notifications','activity','membership','privacy','claims','delegations']],
-  ['الإشراف ومراجعة الأنساب', ['workItems','genealogyReviews','suggestions','workflows']],
-  ['إدارة النظام والصلاحيات', ['forms','permissions','roles','audit','backups']],
+  ['membership', 'الأعضاء والأسرة', ['profile','tree','family','familyTimeline','familySpaces','requests','serviceRequests','services','documents','notifications','activity','membership','privacy','claims','delegations']],
+  ['review', 'الإشراف ومراجعة الأنساب', ['workItems','genealogyReviews','suggestions','workflows']],
+  ['system', 'إدارة النظام والصلاحيات', ['forms','permissions','roles','audit','backups']],
 ];
 
 const glyphs = {
@@ -180,21 +263,53 @@ export function memberHome(user, status) {
 }
 
 export function dashboard(user, modules, status, isAdmin = false) {
-  const groupIcons = ['members', 'review', 'system'];
-  const panels = groups.map(([label, keys], index) => {
-    const allowed = keys.filter(key => modules.includes(key));
-    return allowed.length ? `<section data-module-group><div class="section-heading"><h2>${label}</h2><small>${new Intl.NumberFormat("ar-SA").format(allowed.length)} خدمات</small></div><div class="grid">${allowed.map(key =>
-      `<a class="tile card" href="/dashboard/${key}">${icon(glyphs[key] ? key : groupIcons[index])}<strong>${moduleNames[key]}</strong><span>فتح القسم ←</span></a>`).join('')}</div></section>` : '';
-  }).join('');
-  return page('لوحة التحكم', `<section class="member-hero"><div><h1>لوحة التحكم</h1><p>مرحبًا، ${e(user.name)}</p></div>${isAdmin ? badge("مدير عام — صلاحيات النظام") : badge(status)}
-    <div class="actions"><a class="action-link" href="/profile">الملف الشخصي</a><a class="action-link secondary" href="/">رئيسية البوابة</a><a class="action-link secondary" href="/family/manage">إدارة أسرتي</a>${isAdmin ? '<a class="action-link" href="/admin">مركز الإدارة المتقدم</a><a class="action-link" href="/admin/genealogy">إدارة الأفراد والأنساب</a>' : ''}</div>
+  const allowed = new Set(modules);
+  const number = new Intl.NumberFormat('ar-SA');
+  const available = groups.map(([id, label, keys]) => [id, label, keys.filter(key => allowed.has(key))])
+    .filter(([, , keys]) => keys.length);
+  const total = available.reduce((count, [, , keys]) => count + keys.length, 0);
+  const keywords = {
+    profile: 'الحساب البيانات الشخصية', tree: 'النسب الأقارب', family: 'الأب الأم الأبناء',
+    services: 'المعاملات', requests: 'متابعة حالة الطلب', notifications: 'التنبيهات الرسائل',
+    documents: 'الوثائق الملفات المرفقات', claims: 'ربط الحساب سجل الفرد',
+  };
+  const panels = available.map(([id, label, keys]) =>
+    `<section data-module-group="${id}" aria-labelledby="services-${id}">
+      <div class="section-heading"><h2 id="services-${id}">${label}</h2><small data-group-count>${number.format(keys.length)}</small></div>
+      <div class="grid">${keys.map(key =>
+        `<a class="tile card" href="/dashboard/${key}" data-service-search="${e([moduleNames[key], keywords[key], label].filter(Boolean).join(' '))}">
+          ${icon(glyphs[key] ? key : id)}<strong>${moduleNames[key]}</strong>
+        </a>`).join('')}</div>
+    </section>`).join('');
+  const filters = total ? `<section class="service-filters" aria-label="تصفية الخدمات" hidden>
+    <label class="search-field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${glyphs.search}</svg>
+      <input id="section-search" type="search" aria-label="ابحث في الخدمات" placeholder="ابحث باسم خدمة أو موضوع" autocomplete="off">
+    </label>
+    <div class="service-categories" role="group" aria-label="فئات الخدمات">
+      <button type="button" data-service-category="all" aria-pressed="true">كل الخدمات</button>
+      ${available.map(([id, label]) => `<button type="button" data-service-category="${id}" aria-pressed="false">${label}</button>`).join('')}
+    </div>
+    <p class="service-filter-status" id="service-filter-status" role="status"></p>
   </section>
-  <section class="overview" aria-label="نظرة عامة على الحساب">
-    <div class="card"><h2>حالة العضوية</h2><p class="value">${e(status)}</p></div>${isAdmin ? '<div class="card"><h2>مستوى الوصول</h2><p class="value">مدير عام</p></div>' : ''}
-    <div class="card"><h2>الأقسام المتاحة لك</h2><p class="value">${new Intl.NumberFormat('ar-SA').format(modules.length)}</p></div>
-  </section>
-  ${panels ? `<div class="page-tools"><label class="search-field" aria-label="البحث في أقسام اللوحة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${glyphs.search}</svg><input id="section-search" type="search" placeholder="ابحث عن خدمة أو قسم..." autocomplete="off"></label><span class="section-caption">اختر الخدمة المطلوبة من الأقسام المتاحة</span></div><p id="search-empty" class="search-empty" role="status">لا توجد خدمات مطابقة للبحث.</p>` : ''}
-  ${panels || '<section class="card"><h2>ربط العضوية</h2><p>تُتاح خدمات العضوية بعد ربط الحساب بسجل معتمد وتفعيله من الإدارة. ملفك الشخصي متاح الآن.</p></section>'}`, true);
+  <div id="search-empty" class="card service-no-results" hidden>
+    <p>لا توجد خدمات مطابقة.</p><button class="service-reset" id="reset-service-filters" type="button">مسح التصفية</button>
+  </div>` : '';
+  return page('لوحة التحكم', `<div class="service-dashboard">
+    <section class="member-hero">
+      <div><h1>خدماتي</h1><p>مرحبًا، ${e(user.name)}</p></div>
+      <div class="actions"><a class="action-link" href="/profile">الملف الشخصي</a>
+        <a class="action-link" href="/family/manage">إدارة أسرتي</a>
+        ${isAdmin ? '<a class="action-link" href="/admin">لوحة الإدارة</a><a class="action-link" href="/admin/genealogy">سجل الأفراد والأنساب</a>' : ''}
+      </div>
+    </section>
+    <section class="overview" aria-label="نظرة عامة على الحساب">
+      <div class="card"><h2>حالة العضوية</h2><p class="value">${e(status)}</p></div>
+      <div class="card"><h2>الخدمات المتاحة</h2><p class="value">${number.format(total)}</p></div>
+      ${isAdmin ? '<div class="card"><h2>مستوى الوصول</h2><p class="value">مدير عام</p></div>' : ''}
+    </section>
+    ${filters}
+    ${panels || '<section class="card"><h2>ربط العضوية</h2><p>تُتاح خدمات العضوية بعد ربط الحساب بسجل معتمد وتفعيله من الإدارة. ملفك الشخصي متاح الآن.</p></section>'}
+  </div>`, true, {serviceLayout:true});
 }
 
 const fieldNames = {

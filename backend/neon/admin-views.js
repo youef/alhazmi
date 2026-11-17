@@ -20,18 +20,6 @@ const icon=(name,size=22)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0
 const names={overview:'نظرة عامة',genealogy:'إدارة الأنساب والأفراد',members:'الأعضاء',kinship:'شجرة عائلتي',requests:'طلبات التغيير',services:'الخدمات',claims:'ربط السجلات',roles:'الأدوار والصلاحيات',supervisors:'مشرفو الأفخاذ والعائلات',audit:'سجل التدقيق',system:'حالة النظام'};
 const navOrder=['overview','genealogy','kinship','members','requests','services','claims','roles','supervisors','audit','system'];
 const css=`
-body.diwan-administration{
- --surface:#fff;--canvas:#f3f7f4;--text:#18372a;--muted:#50695b;--line:#dce9e1;
-}
-.diwan-administration>header{background:#fff;color:#163b2a;border-bottom:1px solid var(--line)}
-.diwan-administration>header:before{display:none}
-.diwan-administration>header nav a,.diwan-administration>header nav .brand{color:#174c34}
-.diwan-administration .brand-mark{border-color:var(--line);background:#fff}
-.diwan-administration .diwan-public-utility{
- display:flex;align-items:center;justify-content:space-between;gap:10px;
- padding:8px max(20px,calc((100vw - 1210px)/2));background:#06432e;color:#fff;font-size:.77rem;
-}
-.diwan-administration .diwan-public-utility a{color:inherit;text-underline-offset:3px}
 .adm-root{--a:#076a45;--b:#075138;--sub:#6a7c72;--bd:#deebe3;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px;align-items:start}
 .adm-side{background:#fff;border:1px solid var(--bd);border-radius:20px;position:sticky;top:108px;padding:14px;box-shadow:0 14px 34px #06452a0a}
 .adm-side-title{padding:12px 13px 18px;border-bottom:1px solid var(--bd);margin-bottom:12px;color:#074a30;font-weight:900}
@@ -300,5 +288,5 @@ export function adminView(section,user,data,filter,csrf,done=false){
  else if(section==='audit')content=auditList(data,filter);
  else if(section==='system')content=systemView(data);
  const notice=done?'<div class="adm-notice" role="status">تم تنفيذ الإجراء وتسجيله في سجل التدقيق بنجاح.</div>':'';
- return page(title,'<style>'+css+'</style><div class="adm-root">'+sidebar+'<div class="adm-main">'+hero+notice+content+'</div></div>',true,{administration:true});
+ return page(title,'<style>'+css+'</style><div class="adm-root">'+sidebar+'<div class="adm-main">'+hero+notice+content+'</div></div>',true,{serviceLayout:true});
 }

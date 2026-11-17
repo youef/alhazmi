@@ -67,3 +67,15 @@ test('registry pagination preserves filters and displays parents outside the pic
  assert.match(html,/rel="next" href="[^"]*people_page=3#gen-people"/);
  assert.doesNotMatch(html,/\?child_of=example/);
 });
+
+test('unit pagination keeps the individual page and hides editing from readers',()=>{
+ const html=genealogyView({
+  people:[],peoplePage:2,units:[{id:'example-unit',name_ar:'عائلة تجريبية',unit_type:'family'}],
+  unitPage:2,hasMoreUnits:true,q:'Person',unitQ:'Family',
+  directory:[],directoryUnits:[],tribes:[],sources:[],stats:{},
+  canEditPeople:false,canEditUnits:false,
+ },'csrf-token-test');
+ assert.match(html,/rel="prev" href="[^"]*people_page=2&amp;unit_page=1#gen-units"/);
+ assert.match(html,/rel="next" href="[^"]*people_page=2&amp;unit_page=3#gen-units"/);
+ assert.doesNotMatch(html,/unit_id=example-unit/);
+});

@@ -88,16 +88,21 @@ function personWizard(data,csrf){
  '<label class="gen-check"><input name="allow_duplicate_name" type="checkbox" value="yes">أتفهم وجود أسماء متشابهة وأوافق على إنشاء شخص مختلف بعد التحقق.</label></div>';
  return form('create_tree',csrf,fields,'حفظ الفرد وشجرة أصوله');
 }
-function peoplePagination(data){
- const page=data.peoplePage||1;
- if(page===1&&!data.hasMorePeople)return '';
- const url=number=>'/admin/genealogy?'+new URLSearchParams({
-  q:data.q||'',unit_q:data.unitQ||'',people_page:String(number),
- })+'#gen-people';
- return '<nav class="gen-pagination" aria-label="صفحات سجل الأفراد">'+
+function registryPagination(data, units=false){
+ const page=(units?data.unitPage:data.peoplePage)||1;
+ const hasMore=units?data.hasMoreUnits:data.hasMorePeople;
+ if(page===1&&!hasMore)return '';
+ const url=number=>{
+  const params=new URLSearchParams({q:data.q||'',unit_q:data.unitQ||''});
+  if(units&&data.peoplePage>1)params.set('people_page',data.peoplePage);
+  if(!units&&data.unitPage>1)params.set('unit_page',data.unitPage);
+  params.set(units?'unit_page':'people_page',number);
+  return '/admin/genealogy?'+params+(units?'#gen-units':'#gen-people');
+ };
+ return '<nav class="gen-pagination" aria-label="'+(units?'صفحات وحدات النسب':'صفحات سجل الأفراد')+'">'+
    (page>1?'<a class="gen-compact-button" rel="prev" href="'+e(url(page-1))+'">السابقة</a>':'')+
    '<span>الصفحة '+n(page)+'</span>'+
-   (data.hasMorePeople?'<a class="gen-compact-button" rel="next" href="'+e(url(page+1))+'">التالية</a>':'')+
+   (hasMore?'<a class="gen-compact-button" rel="next" href="'+e(url(page+1))+'">التالية</a>':'')+
    '</nav>';
 }
 function personRows(data){
@@ -278,14 +283,13 @@ function editPersonCard(data,csrf){
   '<details class="gen-details gen-danger"><summary>حذف المسودة (إن لم تكن مرتبطة)</summary>'+remove+'</details></aside></div></section>';
 }
 function unitRows(data){
- const visible=data.units.slice(0,450);
- if(!visible.length)return '<p class="gen-muted">لا توجد وحدات نسب في هذا البحث.</p>';
+ if(!data.units.length)return '<p class="gen-muted">لا توجد وحدات نسب في هذا البحث.</p>';
  return '<div class="gen-scroll"><table class="gen-table"><thead><tr><th>وحدة النسب</th><th>النوع</th><th>حالة النشر</th><th>الإدارة</th></tr></thead><tbody>'+
- visible.map(unit=>{
+ data.units.map(unit=>{
   const url='/admin/genealogy?unit_id='+encodeURIComponent(unit.id)+'#gen-unit-edit';
   return '<tr><td>'+e(unit.name_ar)+'</td><td>'+e(types[unit.unit_type]||unit.unit_type)+'</td>'+
    '<td><span class="gen-pill">'+e(status[unit.review_status]||unit.review_status||'بلا مراجعة')+'</span></td>'+
-   '<td><a class="gen-compact-button" href="'+e(url)+'">فتح محرر الوحدة</a></td></tr>';
+   '<td>'+(data.canEditUnits?'<a class="gen-compact-button" href="'+e(url)+'">فتح محرر الوحدة</a>':'—')+'</td></tr>';
  }).join('')+'</tbody></table></div>';
 }
 function editUnitCard(data,csrf){
@@ -310,7 +314,7 @@ function editUnitCard(data,csrf){
 export function genealogyView(data,csrf){
  const metrics=[
   ['الأفراد',data.stats.people],['الفروع والعائلات',data.stats.units],
-  ['مسودات الأفراد',data.stats.drafts],['وحدات قيد المراجعة',data.stats.unit_reviews],
+  ['أفراد قيد المراجعة',data.stats.drafts],['وحدات قيد المراجعة',data.stats.unit_reviews],
  ].map(([label,value])=>'<article><small>'+e(label)+'</small><strong>'+n(value)+'</strong></article>').join('');
  const shortcuts='<nav class="gen-services" aria-label="خدمات سجل الأنساب">'+
    '<a class="gen-compact-button" href="#gen-people">سجل الأفراد</a>'+
@@ -339,12 +343,12 @@ export function genealogyView(data,csrf){
   (data.canEditPeople?'<section class="gen-section" id="gen-tree-create"><div class="gen-section-head"><div class="gen-section-header"><div><h2>إضافة فرد ونسبه الكامل</h2><small>الفرد ← الأب والأم ← الجد والجدة من الجهتين</small></div></div></div>'+
    (data.childOf?'<div class="gen-result">إضافة نسل جديد للسجل: '+e(data.childOf.full_name_ar)+' — تم اختيار '+e(data.childOf.gender==='female'?'الأم':'الأب')+' تلقائيًا، ويمكن تعديله.</div>':'')+personWizard(data,csrf)+'</section>':'<div class="gen-note">تحتاج إذن تعديل الهويات لإضافة الأفراد وتعديلهم.</div>')+
   '<section class="gen-section" id="gen-people"><div class="gen-section-head"><div><h2>سجل الأفراد</h2></div></div>'+
-   '<form method="get" action="/admin/genealogy#gen-people" class="gen-search"><label>اسم الفرد<input type="search" maxlength="70" name="q" value="'+e(data.q)+'" placeholder="ابحث عن اسم أو لقب"></label>'+h('unit_q',data.unitQ)+
+   '<form method="get" action="/admin/genealogy#gen-people" class="gen-search"><label>اسم الفرد<input type="search" maxlength="70" name="q" value="'+e(data.q)+'" placeholder="ابحث عن اسم أو لقب"></label>'+h('unit_q',data.unitQ)+(data.unitPage>1?h('unit_page',data.unitPage):'')+
     '<button type="submit">بحث</button><a class="gen-compact-button" href="/admin/genealogy?unit_q='+encodeURIComponent(data.unitQ||'')+'#gen-people">مسح</a></form>'+
-   personRows(data)+peoplePagination(data)+'</section>'+
+   personRows(data)+registryPagination(data)+'</section>'+
   '<section class="gen-section" id="gen-units"><div class="gen-section-head"><div class="gen-section-header"><div><h2>إدارة الأفخاذ والعوائل</h2><small>إضافة وتعديل وربط الوحدات بالترتيب الأبوي الصحيح</small></div></div>'+
    '<a class="gen-compact-button" href="https://youef.github.io/alhazmi/ar/lineage/" target="_blank" rel="noopener noreferrer">معاينة الدليل العام</a></div>'+
    (data.canEditUnits?'<details class="gen-details"><summary>＋ إضافة فخذ أو عائلة أو بيت جديد</summary>'+unitForm+'</details>':'<p class="gen-muted">إنشاء الوحدات يحتاج صلاحية إدارة هيكلة النسب.</p>')+
-   '<form method="get" action="/admin/genealogy#gen-units" class="gen-search">'+h('q',data.q)+'<label>اسم الفخذ أو العائلة<input name="unit_q" type="search" maxlength="70" value="'+e(data.unitQ)+'" placeholder="تصفية وحدات النسب"></label><button type="submit">تصفية</button></form>'+
-   unitRows(data)+'</section>'+editUnitCard(data,csrf)+'</div>';
+   '<form method="get" action="/admin/genealogy#gen-units" class="gen-search">'+h('q',data.q)+(data.peoplePage>1?h('people_page',data.peoplePage):'')+'<label>اسم الفخذ أو العائلة<input name="unit_q" type="search" maxlength="70" value="'+e(data.unitQ)+'" placeholder="تصفية وحدات النسب"></label><button type="submit">تصفية</button></form>'+
+   unitRows(data)+registryPagination(data,true)+'</section>'+editUnitCard(data,csrf)+'</div>';
 }
