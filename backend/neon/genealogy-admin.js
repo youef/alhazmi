@@ -17,6 +17,17 @@ const requiredName=value=> {
  catch {throw new HttpError(400,'اسم الشخص مطلوب ويجب ألا يقل عن ثلاثة أحرف');}
 };
 const safeDate=raw=>{ const value=clip(raw,10);if(!value)return null;const d=new Date(value+'T00:00:00Z');if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==value)throw new HttpError(400,'تاريخ الميلاد غير صالح');return value;};
+function registryDate(form,key){
+ const raw=field(form,key,30);
+ if(!raw)return {date:null,precision:'unknown'};
+ const value=raw.replace(/[٠-٩۰-۹]/g, digit=>String(digit.charCodeAt(0)-(digit<='٩'?0x660:0x6f0)));
+ if(!/^[1-9]\d{3}(-\d{2}(-\d{2})?)?$/.test(value))throw new HttpError(400,'اكتب التاريخ بصيغة سنة أو سنة-شهر أو سنة-شهر-يوم.');
+ const format=value.length===4?'year':value.length===7?'month':'day';
+ if(format!=='day'&&form.get(key+'_estimated')==='yes')
+  throw new HttpError(400,'أدخل تاريخًا كاملًا إذا أردت وسمه بالتقريبي.');
+ const date=safeDate(value+(format==='year'?'-01-01':format==='month'?'-01':''));
+ return {date,precision:form.get(key+'_estimated')==='yes'?'estimated':format};
+}
 const validateParents=(father,mother,person)=>{try{assertDistinctParents(father,mother,person);}catch{throw new HttpError(409,'لا يجوز ربط شخص بنفسه أو اختيار الشخص نفسه للأب والأم');}};
 const hmacSecret=()=>process.env.DIWAN_ID_HMAC_KEY||process.env.NEON_AUTH_COOKIE_SECRET;
 const identity=(number,type='national_id')=>{
@@ -123,10 +134,10 @@ async function candidate(db,role,data,tribeId,user,{isMain=false}={}) {
  }
  const familyUnit=isMain?uuid(data.person_family_id):null;
  if(isMain)await getFamily(db,familyUnit,tribeId);
- const dob=isMain?safeDate(data.person_birth_date):null;
+ const birth=isMain?registryDate(new URLSearchParams(data),'person_birth_date'):{date:null,precision:'unknown'};
  const born=isMain?clip(data.person_birth_place,120):null;
- const r=await db.query("insert into public.people(tribe_id,family_unit_id,given_name_ar,full_name_ar,normalized_name,gender,record_status,visibility,created_by,birth_date,birth_date_precision,birth_place) values($1,$2,$3,$4,$5,$6,'under_review','private',$7,$8,case when $8::date is null then 'unknown' else 'day' end,$9) returning id",
-  [tribeId,familyUnit,fullName.split(' ')[0],fullName,canonicalName(fullName),gender,user.id,dob,born]);
+ const r=await db.query("insert into public.people(tribe_id,family_unit_id,given_name_ar,full_name_ar,normalized_name,gender,record_status,visibility,created_by,birth_date,birth_date_precision,birth_place) values($1,$2,$3,$4,$5,$6,'under_review','private',$7,$8,$10,$9) returning id",
+  [tribeId,familyUnit,fullName.split(' ')[0],fullName,canonicalName(fullName),gender,user.id,birth.date,born,birth.precision]);
  const id=r.rows[0].id;
  if(hash) await db.query("insert into public.person_identifiers(person_id,country_code,issuer,identifier_type,identifier_hmac,hmac_key_version,masked_value,status) values($1,'SA','admin-supplied',$2,$3,1,$4,'pending')",[id,kind,hash.digest,'******'+hash.last4]);
  return {id,created:true};
@@ -155,6 +166,7 @@ async function createFamilyTree(db,user,form) {
  details.set('gender',data.person_gender||'unknown');
  details.set('family_id',data.person_family_id||'');
  details.set('birth_date',data.person_birth_date||'');
+ details.set('birth_date_estimated',data.person_birth_date_estimated||'');
  details.set('birth_place',data.person_birth_place||'');
  details.set('father_id',ids.father||'');
  details.set('mother_id',ids.mother||'');
@@ -235,11 +247,11 @@ async function changePerson(db,user,form){
  const person=await getPerson(db,personId);
  const name=requiredName(field(form,'full_name'));
  const gender=field(form,'gender',20);
- const dob=safeDate(form.get('birth_date'));
- const deceasedOn=safeDate(form.get('death_date'));
+ const birth=registryDate(form,'birth_date');
+ const death=registryDate(form,'death_date');
  const living=field(form,'living_status',20)||'unknown';
  if(!['alive','deceased','unknown'].includes(living))throw new HttpError(400,'حالة الحياة غير صالحة');
- if(living==='alive'&&deceasedOn)throw new HttpError(400,'لا يمكن تسجيل تاريخ وفاة لشخص حي');
+ if(living==='alive'&&death.date)throw new HttpError(400,'لا يمكن تسجيل تاريخ وفاة لشخص حي');
  const family=uuid(form.get('family_id'));
  if(!['male','female','unknown','undisclosed'].includes(gender))throw new HttpError(400,'الجنس غير صالح');
  await getFamily(db,family,person.tribe_id);
@@ -250,8 +262,8 @@ async function changePerson(db,user,form){
  if((person.father_id&&person.father_id!==father)||(person.mother_id&&person.mother_id!==mother))
    throw new HttpError(409,'لا يمكن حذف أو استبدال نسب مسجل مباشرة؛ ارفع طلب مراجعة وتصحيح أولًا');
  await updatePrivateDetails(db,user,form,personId);
- await db.query("update public.people set full_name_ar=$2,given_name_ar=$3,normalized_name=$4,gender=$5,family_unit_id=$6,birth_place=$7,biography=$8,birth_date=$9,birth_date_precision=case when $9::date is null then 'unknown' else 'day' end,living_status=$10,death_date=$11,death_date_precision=case when $11::date is null then 'unknown' else 'day' end,record_status='under_review',visibility='private',updated_at=now() where id=$1",
-  [personId,name,name.split(' ')[0],canonicalName(name),gender,family,field(form,'birth_place',120)||null,field(form,'biography',4000)||null,dob,living,deceasedOn]);
+ await db.query("update public.people set full_name_ar=$2,given_name_ar=$3,normalized_name=$4,gender=$5,family_unit_id=$6,birth_place=$7,biography=$8,birth_date=$9,birth_date_precision=$12,living_status=$10,death_date=$11,death_date_precision=$13,middle_name_ar=case when $14::boolean then $15 else middle_name_ar end,surname_ar=case when $16::boolean then $17 else surname_ar end,record_status='under_review',visibility='private',updated_at=now() where id=$1",
+  [personId,name,field(form,'given_name',100)||name.split(' ')[0],canonicalName(name),gender,family,field(form,'birth_place',120)||null,field(form,'biography',4000)||null,birth.date,living,death.date,birth.precision,death.precision,form.has('middle_name'),field(form,'middle_name',150)||null,form.has('surname'),field(form,'surname',100)||null]);
  if(father||mother)await connectParents(db,personId,father,mother);
  await journal(db,user,'genealogy_person_updated','people',personId,{changedFields:['name','gender','family','birth','death','bio','parents','private_details'],needsReview:true});
 }
@@ -461,7 +473,9 @@ async function changeUnit(db,user,form){
  }
  const match=await db.query('select 1 from public.lineage_units where tribe_id=$1 and parent_id is not distinct from $2 and normalized_name=$3 and id<>$4 limit 1',[current.tribe_id,parent,canonicalName(name),id]);
  if(match.rowCount)throw new HttpError(409,'يوجد اسم مطابق في هذه العائلة');
- await db.query('update public.lineage_units set name_ar=$2,normalized_name=$3,parent_id=$4 where id=$1',[id,name,canonicalName(name),parent]);
+ await db.query('update public.lineage_units set name_ar=$2,normalized_name=$3,parent_id=$4,'+
+  'name_en=case when $5::boolean then $6 else name_en end,description=case when $7::boolean then $8 else description end where id=$1',
+  [id,name,canonicalName(name),parent,form.has('name_en'),field(form,'name_en',150)||null,form.has('description'),field(form,'description',2000)||null]);
  if(updateFamilyLink){
   const link=await db.query(
    "insert into public.lineage_family_fakhth_links(family_unit_id,tribe_id,fakhth_unit_id,source_id,raw_source_path,review_status) "+
@@ -560,6 +574,9 @@ export async function genealogyData(user,url){
  await permit(user,'identity.read');
  const q=clip(url.searchParams.get('q'),70);
  const unitQ=clip(url.searchParams.get('unit_q'),70);
+ const view=clip(url.searchParams.get('view'),16)||(!q&&!url.searchParams.has('people_page')&&(unitQ||url.searchParams.has('unit_page'))?'units':'people');
+ const personStatus=clip(url.searchParams.get('person_status'),24);
+ const gap=clip(url.searchParams.get('gap'),16);
  const pageNumber=key=>{
   const value=clip(url.searchParams.get(key),10);
   return /^[1-9]\d{0,8}$/.test(value)?Number(value):1;
@@ -572,35 +589,43 @@ export async function genealogyData(user,url){
   "(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) as identity_mask "+
   "from public.people p left join public.lineage_units l on l.id=p.family_unit_id "+
   "left join public.people father on father.id=p.father_id left join public.people mother on mother.id=p.mother_id "+
-  "where ($1='' or position(lower($1) in lower(p.full_name_ar))>0) "+
+  "where ($1='' or position(lower($1) in lower(p.full_name_ar))>0) and ($4='' or p.record_status=$4) "+
+  "and ($5 not in ('birth','family') or ($5='birth' and p.birth_date is null) or ($5='family' and p.family_unit_id is null)) "+
   "order by p.created_at desc,p.id desc limit $2 offset $3";
  const focusPersonId=uuid(url.searchParams.get('person_id'));
  const childOfId=uuid(url.searchParams.get('child_of'));
  const focusUnitId=uuid(url.searchParams.get('unit_id'));
+ const permissions=await Promise.all(['identity.edit','lineage.structure_apply'].map(key=>authorized(user,key)));
+ const personEditor=Boolean(focusPersonId&&permissions[0]);
+ const unitEditor=Boolean(focusUnitId&&permissions[1]);
+ const creation=Boolean(permissions[0]&&(childOfId||view==='create'));
+ const unitRegistry=view==='units'||Boolean(focusUnitId);
+ const personRegistry=!creation&&!unitRegistry&&view!=='identity'&&!(view==='sources'&&permissions[1]);
+ const queryWhen=(condition,sql,args=[])=>condition?pool.query(sql,args):Promise.resolve({rows:[]});
  const [tribes,people,units,sources,stats,directory,directoryUnits,focusPerson,focusUnit,selectedPeople]=await Promise.all([
-  pool.query('select id,name_ar from public.tribes order by name_ar limit 40'),
-  pool.query(peopleSQL,[q,pageSize+1,(page-1)*pageSize]),
-  pool.query("select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,r.review_status from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id where ($1='' or position(lower($1) in lower(l.name_ar))>0) order by l.name_ar,l.id limit $2 offset $3",[unitQ,pageSize+1,(unitPage-1)*pageSize]),
-  pool.query('select id,tribe_id,title,source_type from public.sources order by created_at desc limit 60'),
-  pool.query("select (select count(*) from public.people) people,(select count(*) from public.people where record_status='under_review') drafts,(select count(*) from public.lineage_units) units,(select count(*) from public.lineage_seed_reviews where review_status='needs_review') unit_reviews"),
-  pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) identity_mask from public.people p where p.record_status<>'archived' order by p.full_name_ar limit 400"),
-  pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units order by name_ar limit 1200'),
-  focusPersonId?pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.birth_date,p.death_date,p.living_status,p.birth_place,p.biography,pp.* from public.people p left join public.person_private pp on pp.person_id=p.id where p.id=$1 limit 1",[focusPersonId]):Promise.resolve({rows:[]}),
-  focusUnitId?pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units where id=$1 limit 1',[focusUnitId]):Promise.resolve({rows:[]}),
-  (focusPersonId||childOfId)?pool.query(
+  queryWhen(creation||unitRegistry&&permissions[1],'select id,name_ar from public.tribes order by name_ar limit 40'),
+  queryWhen(personRegistry,peopleSQL,[q,pageSize+1,(page-1)*pageSize,personStatus,gap]),
+  queryWhen(unitRegistry,"select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,r.review_status from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id where ($1='' or position(lower($1) in lower(l.name_ar))>0) order by l.name_ar,l.id limit $2 offset $3",[unitQ,pageSize+1,(unitPage-1)*pageSize]),
+  queryWhen(permissions[1]&&(unitRegistry||view==='sources'),'select id,tribe_id,title,source_type,author,publication_year from public.sources order by created_at desc,id'),
+  queryWhen(personRegistry&&!personEditor,"select (select count(*) from public.people) people,(select count(*) from public.people where record_status='under_review') drafts,(select count(*) from public.lineage_units) units,(select count(*) from public.lineage_seed_reviews where review_status='needs_review') unit_reviews,(select count(*) from public.people where birth_date is null) missing_birth,(select count(*) from public.people where family_unit_id is null) missing_family"),
+  queryWhen(personEditor||creation,"select p.id,p.full_name_ar,p.gender,p.record_status,(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) identity_mask from public.people p where p.record_status<>'archived' order by p.full_name_ar limit 400"),
+  queryWhen(personEditor||creation||unitRegistry&&permissions[1],'select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units order by name_ar limit 1200'),
+  queryWhen(personEditor,"select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.given_name_ar,p.middle_name_ar,p.surname_ar,p.birth_date,p.birth_date_precision,p.death_date,p.death_date_precision,p.living_status,p.birth_place,p.biography,pp.* from public.people p left join public.person_private pp on pp.person_id=p.id where p.id=$1 limit 1",[focusPersonId]),
+  queryWhen(unitEditor,'select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,l.name_en,l.description,s.title as source_title from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id left join public.sources s on s.id=r.source_id where l.id=$1 limit 1',[focusUnitId]),
+  queryWhen(personEditor||creation&&childOfId,
     "select p.id,p.full_name_ar,p.gender,p.record_status from public.people p where "+
     "(p.id=$1 and p.record_status<>'archived') or p.id in "+
     "(select father_id from public.people where id=$2 union select mother_id from public.people where id=$2)",
     [childOfId,focusPersonId]
-  ):Promise.resolve({rows:[]})
+  )
  ]);
- const permissions=await Promise.all(['identity.edit','lineage.structure_apply'].map(key=>authorized(user,key)));
  // Fetch only one focused person's family graph, never all genealogy profiles.
- const [ancestors,spouses,children]=focusPerson.rows[0]&&permissions[0]?await Promise.all([
+ const [ancestors,spouses,children,birthRecords]=focusPerson.rows[0]&&permissions[0]?await Promise.all([
   pool.query("with relatives as (select father_id id from public.people where id=$1 union select mother_id from public.people where id=$1 union select gp.father_id from public.people child join public.people gp on gp.id in (child.father_id,child.mother_id) where child.id=$1 union select gp.mother_id from public.people child join public.people gp on gp.id in (child.father_id,child.mother_id) where child.id=$1) select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.father_id,p.mother_id,f.name_ar family_name from public.people p left join public.lineage_units f on f.id=p.family_unit_id where p.id in (select id from relatives) limit 12",[focusPersonId]),
   pool.query("select m.id marriage_id,m.status marriage_status,m.start_date,m.end_date,p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,f.name_ar family_name from public.marriages m join public.people p on p.id=case when m.partner_a_id=$1 then m.partner_b_id else m.partner_a_id end left join public.lineage_units f on f.id=p.family_unit_id where m.partner_a_id=$1 or m.partner_b_id=$1 order by m.created_at desc limit 50",[focusPersonId]),
-  pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.father_id,p.mother_id,f.name_ar family_name from public.people p left join public.lineage_units f on f.id=p.family_unit_id where p.father_id=$1 or p.mother_id=$1 order by p.birth_date nulls last,p.full_name_ar limit 160",[focusPersonId])
- ]):[{rows:[]},{rows:[]},{rows:[]}];
+  pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.father_id,p.mother_id,f.name_ar family_name from public.people p left join public.lineage_units f on f.id=p.family_unit_id where p.father_id=$1 or p.mother_id=$1 order by p.birth_date nulls last,p.full_name_ar limit 160",[focusPersonId]),
+  pool.query('select b.born_on,b.birth_place_text,b.status,s.title source_title from public.person_birth_records b left join public.sources s on s.id=b.source_id where b.person_id=$1 order by b.registration_date desc nulls last,b.id',[focusPersonId])
+ ]):[{rows:[]},{rows:[]},{rows:[]},{rows:[]}];
 
  const focused=focusPerson.rows[0]||null;
  if(focused&&permissions[0]){
@@ -617,5 +642,5 @@ export async function genealogyData(user,url){
    if(!parentOptions.has(person.id))parentOptions.set(person.id,person);
  }
  return {tribes:tribes.rows,people:people.rows.slice(0,pageSize),peoplePage:page,hasMorePeople:people.rows.length>pageSize,
-   directory:[...parentOptions.values()],childOf:parentOptions.get(childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows.slice(0,pageSize),unitPage,hasMoreUnits:units.rows.length>pageSize,focusedPerson:focused,relations:{ancestors:ancestors.rows,spouses:spouses.rows,children:children.rows},focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
+   directory:[...parentOptions.values()],childOf:parentOptions.get(childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows.slice(0,pageSize),unitPage,hasMoreUnits:units.rows.length>pageSize,focusedPerson:focused,birthRecords:birthRecords.rows,relations:{ancestors:ancestors.rows,spouses:spouses.rows,children:children.rows},focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0]||{},canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ,view,personStatus,gap};
 }

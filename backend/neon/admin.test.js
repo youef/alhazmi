@@ -164,3 +164,20 @@ test('archiving a member revokes non-system assignments in the same transaction'
   assert.ok(stages.some(sql=>sql.startsWith('update public.user_custom_role_assignments')));
   assert.equal(stages.at(-1),'commit');
 });
+
+test('editing genealogy preserves partial dates and accepts Arabic digits',async()=>{
+ const person='22222222-2222-4222-8222-222222222222';
+ let values;
+ pool.connect=async()=>({query:async(sql,args)=>{
+  if(sql.startsWith('select id,tribe_id')&&sql.includes('from public.people'))
+    return {rowCount:1,rows:[{id:person,father_id:null,mother_id:null}]};
+  if(sql.startsWith('update public.people set full_name_ar'))values=args;
+  return {rowCount:0,rows:[]};
+ },release(){}});
+ const form=new URLSearchParams({operation:'edit_person',csrf:csrfFor(member,req()),id:person,
+  full_name:'شخص تجريبي',gender:'male',birth_date:'١٩٨٠-٠٤',death_date:'۲٠۲۰'});
+ await adminAction(member,'genealogy',req('/admin/genealogy'),form);
+ assert.equal(values[8],'1980-04-01');
+ assert.equal(values[10],'2020-01-01');
+ assert.deepEqual(values.slice(11,13),['month','year']);
+});

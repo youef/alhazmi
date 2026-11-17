@@ -95,6 +95,8 @@ const css=`
 .adm-nav a{position:relative;transition:background .15s ease,color .15s ease;min-height:48px}
 .adm-nav a[aria-current=page]:before{content:"";position:absolute;inset-block:12px;inset-inline-start:0;width:3px;border-radius:6px;background:#08754e}
 .adm-hero{display:flex;flex-direction:column;justify-content:center;min-height:175px}
+.adm-genealogy .adm-hero{min-height:0;padding-block:18px}
+.adm-genealogy .adm-hero h1{font-size:clamp(1.3rem,2.5vw,1.85rem)}
 .adm-hero h1{display:flex;align-items:center;gap:11px;flex-wrap:wrap;line-height:1.3}
 .adm-metrics{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
 .adm-metric{transition:transform .15s ease,box-shadow .15s ease}
@@ -209,7 +211,7 @@ function memberList(data,filter,csrf){
    (lineage?'<p>'+lineage+'</p>':'')+edit+lifecycle+scope+custom+granted+add+archive+'</article>';
  });
  return card('سجل الأعضاء والصلاحيات',scopeSearch+identitySearch+
-  '<div class="adm-chiprow"><a class="adm-link" href="/admin/genealogy#gen-tree-create">إضافة سجل فرد</a>'+
+  '<div class="adm-chiprow"><a class="adm-link" href="/admin/genealogy?view=create#gen-tree-create">إضافة سجل فرد</a>'+
   '<a class="adm-link" href="/admin/supervisors">دعوات الإشراف</a><a class="adm-link" href="/admin/roles">إدارة الأدوار المخصصة</a></div>')+
   (cards.join('')||empty('لا توجد نتائج','جرّب اسمًا آخر أو اختر فخذًا وعائلة.'))+pager('members',filter,data);
 }
@@ -334,5 +336,5 @@ export function adminView(section,user,data,filter,csrf,done=false){
  else if(section==='audit')content=auditList(data,filter);
  else if(section==='system')content=systemView(data);
  const notice=done?'<div class="adm-notice" role="status">تم تنفيذ الإجراء وتسجيله في سجل التدقيق بنجاح.</div>':'';
- return page(title,'<style>'+css+'</style><div class="adm-root">'+sidebar+'<div class="adm-main">'+hero+notice+content+'</div></div>',true,{serviceLayout:true});
+ return page(title,'<style>'+css+'</style><div class="adm-root'+(section==='genealogy'?' adm-genealogy':'')+'">'+sidebar+'<div class="adm-main">'+hero+notice+content+'</div></div>',true,{serviceLayout:true});
 }

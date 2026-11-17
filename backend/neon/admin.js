@@ -319,8 +319,11 @@ export async function adminAction(u,section,req,form){
  await guard(u);
  verify(u,req,form.get('csrf'));
  if(section==='genealogy'){
-  await genealogyAction(u,form);
+  const changed=await genealogyAction(u,form);
   const op=String(form.get('operation')||''),id=String(form.get(op==='add_relation'?'person_id':'id')||'');
+  if(op==='create_tree'&&isId(changed))return '/admin/genealogy?person_id='+encodeURIComponent(changed)+'&done=1#gen-person-edit';
+  if(['create_unit','edit_unit'].includes(op)&&isId(changed))return '/admin/genealogy?unit_id='+encodeURIComponent(changed)+'&done=1#gen-unit-edit';
+  if(['withdraw_unit','delete_unit_draft'].includes(op))return '/admin/genealogy?view=units&done=1';
   return ['edit_person','add_relation'].includes(op)&&isId(id)?'/admin/genealogy?person_id='+encodeURIComponent(id)+'&done=1#gen-person-edit':'/admin/genealogy?done=1';
  }
  const op=clip(form.get('operation'),40),rule=OPERATIONS[op];

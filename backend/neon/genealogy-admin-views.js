@@ -2,6 +2,9 @@ import { escapeHtml as esc } from './member-views.js';
 import { genealogyStyles } from './genealogy-admin-style.js';
 const e=x=>esc(x??'');
 const n=x=>new Intl.NumberFormat('ar-SA').format(Number(x||0));
+const genealogyPath='/admin/genealogy';
+const panels={people:'سجل الأفراد',create:'إضافة فرد',identity:'مطابقة الهوية',units:'الفروع والعائلات',sources:'مصادر التوثيق'};
+const panelLink=key=>genealogyPath+(key==='people'?'':'?view='+key);
 const h=(key,value)=>'<input type="hidden" name="'+e(key)+'" value="'+e(value)+'">';
 const types={branch:'فرع',clan:'بطن',subclan:'فخذ',family:'عائلة',house:'بيت'};
 const status={draft:'مسودة',under_review:'تحت المراجعة',verified:'معتمد',disputed:'متنازع عليه',archived:'مؤرشف',approved:'معتمد للنشر',needs_review:'بانتظار المراجعة'};
@@ -64,25 +67,25 @@ function creationExtras(){
  input('education_level','المؤهل العلمي','',120)+input('employer','جهة العمل','',200)+
  input('job_title','المسمى الوظيفي','',160)+
  '<label>حالة الحياة<select name="living_status"><option value="unknown">غير محددة</option><option value="alive">حي</option><option value="deceased">متوفى</option></select></label>'+
- '<label>تاريخ الوفاة (إن وجد)<input type="date" name="death_date"></label>'+
+ dateInput('death_date','تاريخ الوفاة','','')+
  wide('<label>نبذة تعريفية<textarea name="biography" maxlength="4000" rows="3"></textarea></label>')+
  wide('<label>ملاحظات داخلية مشفرة<textarea name="private_notes" maxlength="5000" rows="5"></textarea></label>')+
  '</div></details>';
 }
 function personWizard(data,csrf){
- const fields='<div class="gen-bundle"><fieldset><legend>01 · الفرد الجديد</legend>'+
+ const fields='<div class="gen-bundle"><fieldset><legend>البيانات الأساسية</legend>'+
  '<div class="gen-form-grid"><label>الاسم الكامل *<input name="person_name" maxlength="200" minlength="3" required placeholder="الاسم الأول واسم الأب والجد"></label>'+
  '<label>الجنس<select name="person_gender"><option value="male">ذكر</option><option value="female">أنثى</option><option value="unknown">غير معروف</option></select></label>'+
  '<label>القبيلة / السجل'+tribeSelect(data)+'</label>'+
  '<label>العائلة / البيت'+familySelect(data)+'</label>'+
  '<label>نوع الوثيقة'+idKind('person_identity_kind')+'</label>'+
- '<label>هوية الشخص (اختياري)<input type="password" inputmode="numeric" name="person_identity" autocomplete="off" maxlength="50" placeholder="لا تُعرض أو تحفظ بصيغتها الخام"></label>'+'<label>تاريخ الميلاد (اختياري)<input type="date" name="person_birth_date"></label>'+'<label>مكان الميلاد (اختياري)<input name="person_birth_place" maxlength="120"></label></div></fieldset>'+
- '<fieldset><legend>02 · الأب والأم</legend><div class="gen-step-notice">اختر شخصًا موجودًا من القائمة أو افتح البطاقة لإضافة الأب والأم بالاسم والهوية. يمكن إضافة الابن حتى لو لم تتوفر سجلات الأجداد كاملة.</div>'+
- relative(data,'father','الأب','ذكر')+relative(data,'mother','الأم','أنثى')+'</fieldset>'+
- '<fieldset><legend>03 · الأجداد من جهة الأب</legend>'+
- relative(data,'father_father','جد الأب','ذكر')+relative(data,'father_mother','جدة الأب','أنثى')+'</fieldset>'+
- '<fieldset><legend>04 · الأجداد من جهة الأم</legend>'+
- relative(data,'mother_father','جد الأم','ذكر')+relative(data,'mother_mother','جدة الأم','أنثى')+'</fieldset>'+creationExtras()+
+ '<label>هوية الشخص (اختياري)<input type="password" inputmode="numeric" name="person_identity" autocomplete="off" maxlength="50" placeholder="لا تُعرض أو تحفظ بصيغتها الخام"></label>'+dateInput('person_birth_date','تاريخ الميلاد','','')+'<label>مكان الميلاد (اختياري)<input name="person_birth_place" maxlength="120"></label></div></fieldset>'+
+ '<details class="gen-details"'+(data.childOf?' open':'')+'><summary>الأب والأم</summary><div class="gen-step-notice">اختر شخصًا موجودًا من القائمة أو افتح البطاقة لإضافة الأب والأم بالاسم والهوية. يمكن إضافة الابن حتى لو لم تتوفر سجلات الأجداد كاملة.</div>'+
+ relative(data,'father','الأب','ذكر')+relative(data,'mother','الأم','أنثى')+'</details>'+
+ '<details class="gen-details"><summary>الأجداد من جهة الأب</summary>'+
+ relative(data,'father_father','جد الأب','ذكر')+relative(data,'father_mother','جدة الأب','أنثى')+'</details>'+
+ '<details class="gen-details"><summary>الأجداد من جهة الأم</summary>'+
+ relative(data,'mother_father','جد الأم','ذكر')+relative(data,'mother_mother','جدة الأم','أنثى')+'</details>'+creationExtras()+
  '<div class="gen-note">جميع الأشخاص الجدد سجلات <b>خاصة وقيد المراجعة</b>. قد يُنشأ حتى ٧ أفراد في عملية واحدة؛ ولا يُنشر أي نسب في الدليل العام تلقائيًا.</div>'+
  '<label class="gen-check"><input name="confirm_reuse" type="checkbox" value="yes">أوافق على استخدام سجل موجود إذا تطابقت بصمة الهوية وراجعت اسم الشخص.</label>'+
  '<label class="gen-check"><input name="allow_duplicate_name" type="checkbox" value="yes">أتفهم وجود أسماء متشابهة وأوافق على إنشاء شخص مختلف بعد التحقق.</label></div>';
@@ -94,6 +97,9 @@ function registryPagination(data, units=false){
  if(page===1&&!hasMore)return '';
  const url=number=>{
   const params=new URLSearchParams({q:data.q||'',unit_q:data.unitQ||''});
+  if(units)params.set('view','units');
+  if(data.personStatus)params.set('person_status',data.personStatus);
+  if(data.gap)params.set('gap',data.gap);
   if(units&&data.peoplePage>1)params.set('people_page',data.peoplePage);
   if(!units&&data.unitPage>1)params.set('unit_page',data.unitPage);
   params.set(units?'unit_page':'people_page',number);
@@ -115,14 +121,19 @@ function personRows(data){
   return '<tr><td><strong>'+e(p.full_name_ar)+'</strong><br><small class="gen-small">'+e(gender[p.gender]||'')+' · '+e(p.identity_mask||'لا توجد هوية')+'</small></td>'+
     '<td>'+e(p.family_name||'عائلة غير محددة')+'<br><small class="gen-small">الأب: '+e(father)+'<br>الأم: '+e(mother)+'</small></td>'+
     '<td><span class="gen-pill">'+e(status[p.record_status]||p.record_status)+'</span></td>'+
-    '<td>'+ (data.canEditPeople?'<div class="gen-action-group"><a class="gen-compact-button" href="'+e(url)+'">تعديل</a>'+
-    '<a class="gen-compact-button" href="/admin/genealogy?child_of='+encodeURIComponent(p.id)+'#gen-tree-create">إضافة ابن/ابنة</a></div>':'—')+'</td></tr>';
+    '<td>'+ (data.canEditPeople?'<a class="gen-compact-button" href="'+e(url)+'">فتح السجل</a>':'—')+'</td></tr>';
  }).join('')+'</tbody></table></div>';
 }
 const dateValue=value=>{
  if(!value)return '';
  const date=new Date(value);
  return Number.isNaN(date.getTime())?'':date.toISOString().slice(0,10);
+};
+const dateInput=(name,title,value,precision)=>{
+ const formatted=dateValue(value);
+ const display=precision==='year'?formatted.slice(0,4):precision==='month'?formatted.slice(0,7):formatted;
+ return '<label>'+title+'<input name="'+name+'" value="'+e(display)+'" placeholder="YYYY أو YYYY-MM أو YYYY-MM-DD" maxlength="10" dir="ltr"></label>'+
+  '<label class="gen-check"><input type="checkbox" name="'+name+'_estimated" value="yes"'+(precision==='estimated'?' checked':'')+'>تاريخ تقريبي</label>';
 };
 const input=(name,title,value='',max=160,type='text',other='')=>
  '<label>'+e(title)+'<input name="'+e(name)+'" type="'+e(type)+'" maxlength="'+max+'" value="'+e(value??'')+'" '+other+'></label>';
@@ -227,43 +238,48 @@ function editPersonCard(data,csrf){
  const employment=[
   ['','— غير محددة —'],['employed','موظف'],['self_employed','عمل حر'],['unemployed','غير موظف'],['student','طالب'],['retired','متقاعد'],['unknown','غير معروف']
  ].map(([v,l])=>'<option value="'+v+'"'+selected(v,p.employment_status||'')+'>'+l+'</option>').join('');
+ const section=(title,body,open=false)=>'<details class="gen-edit-fieldset"'+(open?' open':'')+'><summary>'+title+'</summary>'+body+'</details>';
  const editor=h('id',p.id)+
-  '<fieldset class="gen-edit-fieldset"><legend>01 · البيانات الأساسية والنسب</legend><div class="gen-form-grid">'+
+  section('الاسم والعائلة','<div class="gen-form-grid">'+
   wide(input('full_name','الاسم الكامل',p.full_name_ar,200,'text','required'))+
+  input('given_name','الاسم الأول',p.given_name_ar,100)+input('middle_name','اسم الأب والأجداد',p.middle_name_ar,150)+
+  input('surname','اسم العائلة أو اللقب',p.surname_ar,100)+
   '<label>الجنس'+genderSelect(p.gender)+'</label>'+
   '<label>العائلة / البيت'+familySelect(data,p.family_unit_id,'family_id')+'</label>'+
   '<label>الأب'+selectParents(data,'father',p.father_id)+'</label>'+
   '<label>الأم'+selectParents(data,'mother',p.mother_id)+'</label>'+
-  '</div><p class="gen-muted">يمكن إضافة أب أو أم غير مسجلين. تغيير الوالدين المرتبطين مسبقًا يتم عبر طلب تصحيح موثق لحماية تسلسل الأنساب.</p></fieldset>'+
-  '<fieldset class="gen-edit-fieldset"><legend>02 · الميلاد والحالة والنبذة</legend><div class="gen-form-grid">'+
+  '</div><p class="gen-muted">يمكن إضافة أب أو أم غير مسجلين. تغيير الوالدين المرتبطين مسبقًا يتم عبر طلب تصحيح موثق لحماية تسلسل الأنساب.</p>',true)+
+  section('الميلاد والوفاة والنبذة','<div class="gen-form-grid">'+
   input('birth_place','مكان الميلاد',p.birth_place,120)+
-  '<label>تاريخ الميلاد<input name="birth_date" type="date" value="'+e(dateValue(p.birth_date))+'"></label>'+
+  dateInput('birth_date','تاريخ الميلاد',p.birth_date,p.birth_date_precision)+
   '<label>حالة الحياة<select name="living_status"><option value="unknown"'+selected('unknown',p.living_status)+'>غير معروفة</option><option value="alive"'+selected('alive',p.living_status)+'>حي</option><option value="deceased"'+selected('deceased',p.living_status)+'>متوفى</option></select></label>'+
-  '<label>تاريخ الوفاة (إن وجد)<input type="date" name="death_date" value="'+e(dateValue(p.death_date))+'"></label>'+
+  dateInput('death_date','تاريخ الوفاة',p.death_date,p.death_date_precision)+
   wide('<label>نبذة تعريفية (تخضع للمراجعة قبل إتاحتها)<textarea name="biography" maxlength="4000" rows="4">'+e(p.biography||'')+'</textarea></label>')+
-  '</div></fieldset>'+
-  '<fieldset class="gen-edit-fieldset"><legend>03 · الهوية والوثائق الحساسة</legend><div class="gen-form-grid">'+
+  '</div>')+
+  section('الهوية','<div class="gen-form-grid">'+
   wide('<p class="gen-sensitive">الهوية المسجلة: <strong dir="ltr">'+e(p.national_id_last4?'••••••'+p.national_id_last4:'غير موجودة في الملف الخاص')+'</strong>. لن يظهر الرقم الكامل بعد الحفظ، ويمكن استبدال الهوية غير المعتمدة برقم صحيح.</p>')+
   '<label>نوع الوثيقة'+idKind()+'</label>'+
   input('identity','تسجيل أو استبدال رقم الهوية','',50,'password','autocomplete="new-password" inputmode="numeric" placeholder="اتركه فارغًا للمحافظة على الحالي"')+
   wide('<label class="gen-check"><input type="checkbox" name="remove_identity" value="yes">إلغاء الهوية غير المعتمدة وحذف نسختها المشفّرة من الملف (اترك الرقم الجديد فارغًا)</label>')+
-  '</div></fieldset>'+
-  '<fieldset class="gen-edit-fieldset"><legend>04 · العنوان الوطني والسكن</legend><div class="gen-form-grid">'+
+  '</div>')+
+  section('العنوان الوطني والسكن','<div class="gen-form-grid">'+
   input('city','المدينة',p.city,100)+input('region','المنطقة',p.region,100)+
   input('country','رمز الدولة',p.country||'SA',2,'text','placeholder="SA"')+
-  addressRows+'</div><p class="gen-muted">تفاصيل المبنى والشارع والحي والرمز البريدي والعنوان المختصر مشفّرة في قاعدة البيانات.</p></fieldset>'+
-  '<fieldset class="gen-edit-fieldset"><legend>05 · التواصل والعمل والتعليم</legend><div class="gen-form-grid">'+
+  addressRows+'</div><p class="gen-muted">تفاصيل المبنى والشارع والحي والرمز البريدي والعنوان المختصر مشفّرة في قاعدة البيانات.</p>')+
+  section('التواصل والعمل والتعليم','<div class="gen-form-grid">'+
   input('phone','رقم الجوال',p.phone,32,'tel','autocomplete="off"')+
   input('email','البريد الإلكتروني',p.email,254,'email','autocomplete="off"')+
   '<label>الحالة الوظيفية<select name="employment_status">'+employment+'</select></label>'+
   input('education_level','المؤهل العلمي',p.education_level,120)+
   input('employer','جهة العمل',p.employer,200)+
   input('job_title','المسمى الوظيفي',p.job_title,160)+
-  '</div></fieldset>'+
-  '<fieldset class="gen-edit-fieldset"><legend>06 · التفاصيل الطويلة الخاصة</legend>'+
+  '</div>')+
+  section('الملاحظات الداخلية',
   '<p class="gen-muted">ملاحظات لا تُعرض للزوار أو في الشجرة العامة؛ محمية بالتشفير وصلاحيات الإدارة.</p>'+
-  '<label>الملاحظات الداخلية الكاملة<textarea name="private_notes" maxlength="5000" rows="7" placeholder="توثيق خاص، بيانات إضافية، تواريخ وتفاصيل تحتاج الحفظ...">'+e(p.private_notes||'')+'</textarea></label>'+
-  '</fieldset><p class="gen-muted">حفظ التعديل يعيد السجل للمراجعة، ويحفظ المحتوى الخاص منفصلًا عن النبذة العامة.</p>';
+  '<label>الملاحظات الداخلية<textarea name="private_notes" maxlength="5000" rows="7" placeholder="أضف ملاحظة داخلية">'+e(p.private_notes||'')+'</textarea></label>')+'<p class="gen-muted">حفظ التعديل يعيد السجل للمراجعة، ويحفظ المحتوى الخاص منفصلًا عن النبذة العامة.</p>';
+ const birthDocuments=data.birthRecords?.length?'<details class="gen-details"><summary>سجلات الميلاد المرتبطة</summary>'+
+  '<ul>'+data.birthRecords.map(record=>'<li>'+e([dateValue(record.born_on),record.birth_place_text,record.source_title].filter(Boolean).join(' · ')||'سجل ميلاد بلا تاريخ محدد')+
+   (record.status?'<span class="gen-pill">'+e(status[record.status]||record.status)+'</span>':'')+'</li>').join('')+'</ul></details>':'';
  const edit=form('edit_person',csrf,editor,'حفظ جميع بيانات الفرد');
  const archive=form(p.record_status==='archived'?'restore_person':'archive_person',csrf,h('id',p.id)+
   '<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>أؤكد '+(p.record_status==='archived'?'استعادة':'أرشفة')+' سجل الفرد</label>',
@@ -273,10 +289,10 @@ function editPersonCard(data,csrf){
   '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>أؤكد حذف المسودة غير المرتبطة</label>',
   'حذف المسودة');
  return '<section class="gen-section gen-editor" id="gen-person-edit">'+
-  '<div class="gen-section-head"><div><span class="gen-editor-eyebrow">السجل الشخصي · تفاصيل الإدارة</span><h2>تعديل سجل: '+e(p.full_name_ar)+'</h2>'+
-  '<small>محرر متكامل لفرد واحد للحفاظ على الأداء · البيانات الحساسة خاصة ومشفّرة</small></div>'+
+  '<div class="gen-section-head"><div><h2>تعديل سجل: '+e(p.full_name_ar)+'</h2>'+
+  '<small>افتح المجموعة المطلوبة ثم احفظ التعديلات.</small></div>'+
   '<a href="/admin/genealogy" class="gen-compact-button">إغلاق المحرر</a></div>'+
-  '<div class="gen-editor-layout"><div class="gen-editor-main">'+relationEditor(data,csrf)+edit+'</div>'+
+  '<div class="gen-editor-layout"><div class="gen-editor-main">'+edit+birthDocuments+'<details class="gen-details gen-relation-fold"><summary>القرابة والأصول والأبناء</summary>'+relationEditor(data,csrf)+'</details>'+'</div>'+
   '<aside class="gen-editor-side"><div class="gen-side-panel"><h3>حالة السجل</h3><span class="gen-pill">'+e(status[p.record_status]||p.record_status)+'</span>'+
   '<p class="gen-muted">ترتبط بيانات الأنساب بمراجعة موثقة. لا يؤدي تغيير البيانات الخاصة إلى نشرها للعامة.</p></div>'+
   '<details class="gen-details"><summary>أرشفة / استعادة السجل</summary>'+archive+'</details>'+
@@ -297,6 +313,9 @@ function editUnitCard(data,csrf){
  if(!unit||!data.canEditUnits)return '';
  const update=form('edit_unit',csrf,h('id',unit.id)+
    '<label>اسم الوحدة<input name="name" maxlength="150" value="'+e(unit.name_ar)+'" required></label>'+
+   input('name_en','الاسم بالإنجليزية',unit.name_en,150)+
+   '<label>الوصف<textarea name="description" maxlength="2000" rows="4">'+e(unit.description)+'</textarea></label>'+
+   (unit.source_title?'<p class="gen-note">المصدر: '+e(unit.source_title)+'</p>':'')+
    '<label>الأصل'+unitSelect(data,unit.parent_id,'— دون أصل —',data.directoryUnits)+'</label>'+
    '<p class="gen-muted">يعود كل تعديل إلى قائمة المراجعة. نقل وحدة تحتوي أبناء غير مسموح مباشرة.</p>',
    'حفظ تعديل الوحدة');
@@ -306,7 +325,7 @@ function editUnitCard(data,csrf){
    '<p class="gen-muted">الحذف متاح للسجلات اليدوية الجديدة غير المعتمدة والخالية من أي روابط.</p>'+
    '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>تأكيد حذف وحدة مسودة</label>','حذف المسودة');
  return '<section class="gen-section" id="gen-unit-edit"><div class="gen-section-head"><div><h2>تعديل وحدة النسب: '+e(unit.name_ar)+'</h2><small>تعديل المسمى والتسلسل مع سجل تدقيق</small></div>'+
-   '<a class="gen-compact-button" href="/admin/genealogy">إغلاق المحرر</a></div>'+
+   '<a class="gen-compact-button" href="/admin/genealogy?view=units">العودة إلى الوحدات</a></div>'+
    '<div class="gen-form-grid"><div>'+update+'</div><div class="gen-bundle">'+
    '<details class="gen-details"><summary>إيقاف النشر للمراجعة</summary>'+withdraw+'</details>'+
    '<details class="gen-details"><summary>حذف مسودة الوحدة</summary>'+remove+'</details></div></div></section>';
@@ -316,11 +335,13 @@ export function genealogyView(data,csrf){
   ['الأفراد',data.stats.people],['الفروع والعائلات',data.stats.units],
   ['أفراد قيد المراجعة',data.stats.drafts],['وحدات قيد المراجعة',data.stats.unit_reviews],
  ].map(([label,value])=>'<article><small>'+e(label)+'</small><strong>'+n(value)+'</strong></article>').join('');
- const shortcuts='<nav class="gen-services" aria-label="خدمات سجل الأنساب">'+
-   '<a class="gen-compact-button" href="#gen-people">سجل الأفراد</a>'+
-   (data.canEditPeople?'<a class="gen-submit" href="#gen-tree-create">إضافة فرد</a>':'')+
-   '<a class="gen-compact-button" href="#gen-identity">البحث بالهوية</a>'+
-   '<a class="gen-compact-button" href="#gen-units">الفروع والعائلات</a></nav>';
+ const requested=data.view==='sources'&&!data.canEditUnits?'people':data.view;
+ const current=data.lookup?'identity':data.focusedPerson?'person':data.focusedUnit?'unit':
+  (data.childOf?'create':Object.hasOwn(panels,requested)?requested:data.unitPage>1||!data.q&&data.unitQ?'units':'people');
+ const active=current==='person'?'people':current==='unit'?'units':current;
+ const shortcuts='<nav class="gen-services" aria-label="أقسام إدارة الأنساب">'+
+  Object.entries(panels).filter(([key])=>(key!=='create'||data.canEditPeople)&&(key!=='sources'||data.canEditUnits))
+   .map(([key,label])=>'<a href="'+panelLink(key)+'"'+(key===active?' aria-current="page"':'')+'>'+label+'</a>').join('')+'</nav>';
  const identityBox=data.lookup?'<div class="gen-result" role="status">'+
    (data.lookup.matched?'الهوية مسجلة باسم: '+e(data.lookup.record.full_name_ar)+' • '+e(data.lookup.record.masked_value||'رقم مقنّع')+' • الحالة: '+e(status[data.lookup.record.record_status]||data.lookup.record.record_status)+(data.canEditPeople?' <a href="/admin/genealogy?person_id='+encodeURIComponent(data.lookup.record.id)+'#gen-person-edit">فتح سجل الفرد</a>':''):
    'لا يوجد تطابق لهذه الهوية في الفهرس الحالي. يمكن إضافة الشخص كمراجعة جديدة.')+
@@ -329,26 +350,42 @@ export function genealogyView(data,csrf){
   '<div class="gen-form-grid"><label>نوع الهوية'+idKind()+'</label>'+
   '<label>الرقم المطلوب مطابقته<input name="identity" type="password" inputmode="numeric" autocomplete="off" maxlength="50" required placeholder="لا تظهر الهوية في الرابط أو نتائج البحث"></label></div>',
   'فحص وجود الهوية');
- const unitForm=form('create_unit',csrf,
+ const unitForm=()=>form('create_unit',csrf,
   '<div class="gen-form-grid"><label>القبيلة'+tribeSelect(data)+'</label>'+
   '<label>النوع<select name="unit_type"><option value="branch">فرع</option><option value="clan">بطن</option><option value="subclan">فخذ</option><option value="family">عائلة</option><option value="house">بيت</option></select></label>'+
   '<label>الاسم<input name="name" required maxlength="150" placeholder="اسم الفخذ أو العائلة"></label>'+
   '<label>تابع إلى'+unitSelect(data)+'</label>'+
   '<label class="gen-wide">مصدر التوثيق<select name="source_id" required>'+options(data.sources,'id',s=>s.title+' · '+s.source_type,'','— اختر مصدرًا —')+'</select></label></div>'+
   '<p class="gen-muted">الفخذ يحتاج أصلًا من الفروع، والعائلة تحتاج فخذًا. السجلات الجديدة لا تُنشر قبل اعتمادها.</p>', 'إضافة الفخذ أو العائلة');
- return '<style>'+genealogyStyles+'</style><div class="gen-shell">'+
-  shortcuts+'<div class="gen-summary">'+metrics+'</div>'+editPersonCard(data,csrf)+
-  '<section class="gen-section" id="gen-identity"><div class="gen-section-head"><div class="gen-section-header"><div><h2>البحث عن هوية مسجلة</h2><small>كشف التطابق دون إظهار الرقم الأصلي أو إضافته إلى عنوان الصفحة</small></div></div></div>'+
-    '<p class="gen-note">يتطلب البحث الرقم الكامل. يظهر الرقم مقنّعًا في النتيجة.</p>'+identityBox+identitySearch+'</section>'+
-  (data.canEditPeople?'<section class="gen-section" id="gen-tree-create"><div class="gen-section-head"><div class="gen-section-header"><div><h2>إضافة فرد ونسبه الكامل</h2><small>الفرد ← الأب والأم ← الجد والجدة من الجهتين</small></div></div></div>'+
-   (data.childOf?'<div class="gen-result">إضافة نسل جديد للسجل: '+e(data.childOf.full_name_ar)+' — تم اختيار '+e(data.childOf.gender==='female'?'الأم':'الأب')+' تلقائيًا، ويمكن تعديله.</div>':'')+personWizard(data,csrf)+'</section>':'<div class="gen-note">تحتاج إذن تعديل الهويات لإضافة الأفراد وتعديلهم.</div>')+
-  '<section class="gen-section" id="gen-people"><div class="gen-section-head"><div><h2>سجل الأفراد</h2></div></div>'+
-   '<form method="get" action="/admin/genealogy#gen-people" class="gen-search"><label>اسم الفرد<input type="search" maxlength="70" name="q" value="'+e(data.q)+'" placeholder="ابحث عن اسم أو لقب"></label>'+h('unit_q',data.unitQ)+(data.unitPage>1?h('unit_page',data.unitPage):'')+
-    '<button type="submit">بحث</button><a class="gen-compact-button" href="/admin/genealogy?unit_q='+encodeURIComponent(data.unitQ||'')+'#gen-people">مسح</a></form>'+
-   personRows(data)+registryPagination(data)+'</section>'+
-  '<section class="gen-section" id="gen-units"><div class="gen-section-head"><div class="gen-section-header"><div><h2>إدارة الأفخاذ والعوائل</h2><small>إضافة وتعديل وربط الوحدات بالترتيب الأبوي الصحيح</small></div></div>'+
-   '<a class="gen-compact-button" href="https://youef.github.io/alhazmi/ar/lineage/" target="_blank" rel="noopener noreferrer">معاينة الدليل العام</a></div>'+
-   (data.canEditUnits?'<details class="gen-details"><summary>＋ إضافة فخذ أو عائلة أو بيت جديد</summary>'+unitForm+'</details>':'<p class="gen-muted">إنشاء الوحدات يحتاج صلاحية إدارة هيكلة النسب.</p>')+
-   '<form method="get" action="/admin/genealogy#gen-units" class="gen-search">'+h('q',data.q)+(data.peoplePage>1?h('people_page',data.peoplePage):'')+'<label>اسم الفخذ أو العائلة<input name="unit_q" type="search" maxlength="70" value="'+e(data.unitQ)+'" placeholder="تصفية وحدات النسب"></label><button type="submit">تصفية</button></form>'+
-   unitRows(data)+registryPagination(data,true)+'</section>'+editUnitCard(data,csrf)+'</div>';
+ const identity=()=>'<section class="gen-section" id="gen-identity"><h2>مطابقة هوية</h2>'+
+  '<p class="gen-muted">أدخل الرقم الكامل. تظهر نتيجة المطابقة برقم مقنّع.</p>'+identityBox+identitySearch+'</section>';
+ const create=()=>data.canEditPeople?'<section class="gen-section" id="gen-tree-create"><h2>إضافة فرد</h2>'+
+  (data.childOf?'<p class="gen-result">الوالد المرتبط: '+e(data.childOf.full_name_ar)+'</p>':'')+
+  personWizard(data,csrf)+'</section>':'<p class="gen-note">إضافة الأفراد تتطلب صلاحية تعديل الهوية.</p>';
+ const people=()=>'<section class="gen-section" id="gen-people"><div class="gen-section-head"><h2>سجل الأفراد</h2>'+
+  (data.canEditPeople?'<a class="gen-submit" href="'+panelLink('create')+'">إضافة فرد</a>':'')+'</div>'+
+  '<form method="get" action="/admin/genealogy#gen-people" class="gen-search"><label>اسم الفرد<input type="search" maxlength="70" name="q" value="'+e(data.q)+'" placeholder="الاسم أو اللقب"></label>'+
+  '<label>حالة السجل<select name="person_status"><option value="">الكل</option>'+
+  ['under_review','verified','disputed','archived'].map(key=>'<option value="'+key+'"'+(key===data.personStatus?' selected':'')+'>'+status[key]+'</option>').join('')+
+  '</select></label><label>اكتمال البيانات<select name="gap"><option value="">الكل</option>'+
+  '<option value="birth"'+(data.gap==='birth'?' selected':'')+'>بدون تاريخ ميلاد</option>'+
+  '<option value="family"'+(data.gap==='family'?' selected':'')+'>بدون عائلة</option>'+
+  '</select></label><button type="submit">بحث</button><a class="gen-compact-button" href="'+panelLink('people')+'">مسح</a></form>'+
+  '<div class="gen-links gen-gaps"><a href="'+genealogyPath+'?gap=birth">بدون تاريخ ميلاد ('+n(data.stats.missing_birth)+')</a>'+
+  '<a href="'+genealogyPath+'?gap=family">بدون عائلة ('+n(data.stats.missing_family)+')</a></div>'+
+  personRows(data)+registryPagination(data)+'</section>';
+ const units=()=>'<section class="gen-section" id="gen-units"><div class="gen-section-head"><h2>الفروع والعائلات</h2>'+
+  '<a class="gen-compact-button" href="/dashboard/tree">فتح الشجرة</a></div>'+
+  (data.canEditUnits?'<details class="gen-details"><summary>إضافة وحدة نسب</summary>'+unitForm()+'</details>':'')+
+  '<form method="get" action="/admin/genealogy#gen-units" class="gen-search">'+h('view','units')+
+  '<label>اسم الوحدة<input name="unit_q" type="search" maxlength="70" value="'+e(data.unitQ)+'"></label><button type="submit">بحث</button></form>'+
+  unitRows(data)+registryPagination(data,true)+'</section>';
+ const sources=()=>'<section class="gen-section"><h2>مصادر التوثيق</h2>'+
+  (data.sources.length?'<div class="gen-scroll"><table class="gen-table"><thead><tr><th>المصدر</th><th>النوع</th><th>المؤلف</th><th>السنة</th></tr></thead><tbody>'+
+   data.sources.map(item=>'<tr><td>'+e(item.title)+'</td><td>'+e(item.source_type)+'</td><td>'+e(item.author||'—')+'</td><td>'+e(item.publication_year||'—')+'</td></tr>').join('')+
+   '</tbody></table></div>':'<p class="gen-muted">لا توجد مصادر مسجلة.</p>')+'</section>';
+ const content={people,create,identity,units,sources};
+ const selected=current==='person'?editPersonCard(data,csrf)||people():current==='unit'?editUnitCard(data,csrf)||units():content[current]();
+ return '<style>'+genealogyStyles+'</style><div class="gen-shell">'+shortcuts+
+  (current==='people'?'<div class="gen-summary">'+metrics+'</div>':'')+selected+'</div>';
 }

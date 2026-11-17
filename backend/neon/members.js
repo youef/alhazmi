@@ -198,6 +198,7 @@ export default {
           }
           if(section==='genealogy' && submitted.get('operation')==='lookup_identity'){
             const result=await genealogyIdentityLookup(account,request,submitted);
+            url.searchParams.set('view','identity');
             const {data,filter}=await adminData(account,section,url);
             data.lookup=result;
             return html(adminView(section,user,data,filter,csrfFor(account,request),false));

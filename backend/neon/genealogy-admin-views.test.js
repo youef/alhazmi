@@ -22,7 +22,7 @@ test('genealogy editor renders full private fields and keeps existing parents se
  assert.match(html,/name="father_id"/);
  assert.match(html,/option value="" disabled/);
  assert.ok(html.includes('creationExtras')===false);
- assert.ok(html.includes('تفاصيل الفرد الخاصة'));
+ assert.match(html, /<summary>الملاحظات الداخلية<\/summary>/);
 });
 
 test('focused genealogy displays ancestry when no marriage has been recorded',()=>{
@@ -78,4 +78,21 @@ test('unit pagination keeps the individual page and hides editing from readers',
  assert.match(html,/rel="prev" href="[^"]*people_page=2&amp;unit_page=1#gen-units"/);
  assert.match(html,/rel="next" href="[^"]*people_page=2&amp;unit_page=3#gen-units"/);
  assert.doesNotMatch(html,/unit_id=example-unit/);
+});
+
+test('the default genealogy view shows the registry without rendering sensitive forms',()=>{
+ const data={people:[],units:[],sources:[],tribes:[],directory:[],stats:{},canEditPeople:true,canEditUnits:true};
+ const html=genealogyView(data,'test-token');
+ assert.match(html,/aria-current="page">سجل الأفراد/);
+ assert.doesNotMatch(html,/name="person_identity"|name="identity"|id="gen-units"/);
+ const identity=genealogyView({...data,view:'identity'},'test-token');
+ assert.match(identity,/aria-current="page">مطابقة الهوية/);
+ assert.match(identity,/name="identity"/);
+ assert.doesNotMatch(identity,/id="gen-people"/);
+});
+
+test('the editor displays a partial birth date without inventing a day or month',()=>{
+ const data={people:[],units:[],sources:[],tribes:[],directory:[],stats:{},canEditPeople:true,
+   focusedPerson:{id:'example',full_name_ar:'شخص تجريبي',birth_date:'1980-01-01',birth_date_precision:'year'}};
+ assert.match(genealogyView(data,'test-token'),/name="birth_date" value="1980"/);
 });

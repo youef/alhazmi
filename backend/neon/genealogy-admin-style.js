@@ -151,4 +151,27 @@ export const genealogyStyles=`
  .gen-shell :is(a,input,select,textarea){transition:none}
  .gen-compact-button:hover{transform:none}
 }
+
+.gen-shell{gap:18px}
+.gen-shell .gen-services{display:flex;flex-wrap:wrap;justify-content:flex-start;background:#fff;
+ border:1px solid var(--gen-border);border-radius:14px;padding:7px;gap:4px}
+.gen-shell .gen-services a{display:flex;min-height:44px;align-items:center;justify-content:center;
+ padding:7px 12px;color:#385748;font-weight:750;border-radius:8px;text-decoration:none}
+.gen-shell .gen-services a[aria-current=page]{background:#e2f2e8;color:#075138;box-shadow:inset 0 -2px #168352}
+.gen-shell .gen-services a:hover{background:#edf6f0;color:#075138}
+.gen-summary article{border-inline-start:3px solid #80baa0}
+.gen-section h2{color:var(--gen-text)}
+.gen-section .gen-submit{text-decoration:none}
+.gen-section>.gen-muted{margin:5px 0 14px}
+.gen-editor-main{display:grid;gap:16px}
+.gen-edit-fieldset>summary{cursor:pointer;font-weight:850;color:#075138;min-height:26px}
+.gen-edit-fieldset[open]>summary{padding-bottom:10px;border-block-end:1px solid var(--gen-border);margin-bottom:12px}
+.gen-relation-fold[open] .gen-relation-panel{margin:0;border:0;padding:6px 0;background:transparent}
+.gen-table tbody tr:hover{background:#edf7f1}
+.gen-search{margin-top:10px}
+.gen-gaps{margin:0 0 12px;gap:14px}
+@media(max-width:620px){
+ .gen-shell .gen-services{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .gen-shell .gen-services a{padding-inline:5px;font-size:.87rem}
+}
 `;
