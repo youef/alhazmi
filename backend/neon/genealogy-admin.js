@@ -394,14 +394,17 @@ async function deletePersonDraft(db,user,form){
  if(!removed.rowCount)throw new HttpError(409,'تعذر حذف المسودة');
  await journal(db,user,'genealogy_draft_deleted','people',id);
 }
-async function ancestorOfUnit(db,unitId,tribeId,kind) {
- if(!unitId)return null;
- const r=await db.query(
+async function registrationParent(db,unitId,tribeId,type){
+ const ancestor=type==='family'
+  ?'join public.lineage_fakhths f on f.unit_id=a.id and f.tribe_id=$2'
+  :"where a.unit_type='branch' and a.parent_id is null";
+ const result=await db.query(
   'with recursive parents(id,parent_id,unit_type,depth,path) as ('+
   'select id,parent_id,unit_type,0,array[id] from public.lineage_units where id=$1 and tribe_id=$2 '+
-  'union all select u.id,u.parent_id,u.unit_type,p.depth+1,p.path||u.id from parents p join public.lineage_units u on u.id=p.parent_id and u.tribe_id=$2 where p.depth<30 and not u.id=any(p.path)) '+
-  'select id from parents where unit_type=$3 order by depth limit 1',[unitId,tribeId,kind]);
- return r.rows[0]?.id||null;
+  'union all select u.id,u.parent_id,u.unit_type,a.depth+1,a.path||u.id from parents a join public.lineage_units u on u.id=a.parent_id and u.tribe_id=$2 where not u.id=any(a.path)) '+
+  'select a.id from parents a '+ancestor+' order by a.depth limit 1',[unitId,tribeId]);
+ if(!result.rowCount)throw new HttpError(400,type==='family'?'اختر أصلًا تابعًا لفخذ مسجل في القبيلة.':'اختر أصلًا تابعًا لفرع رئيسي في القبيلة.');
+ return result.rows[0].id;
 }
 async function checkUnit(db,unitId,tribeId){
  if(!unitId)return null;
@@ -418,49 +421,63 @@ async function createUnit(db,user,form){
  const source=(await db.query('select id from public.sources where id=$1 and tribe_id=$2',[sourceId,tribeId])).rows[0];
  if(!source)throw new HttpError(400,'المصدر يجب أن يتبع القبيلة');
  if(parentId)await checkUnit(db,parentId,tribeId);
- if(type==='family' && !await ancestorOfUnit(db,parentId,tribeId,'subclan'))throw new HttpError(400,'اختر فخذًا معتمدًا في التسلسل قبل إضافة العائلة');
+ const registryParent=['family','subclan'].includes(type)?await registrationParent(db,parentId,tribeId,type):null;
  const d=await db.query("select id from public.lineage_units where tribe_id=$1 and parent_id is not distinct from $2 and normalized_name=$3 limit 1",[tribeId,parentId,canonicalName(name)]);
  if(d.rowCount)throw new HttpError(409,'وحدة باسم مطابق موجودة تحت الأصل نفسه');
  const r=await db.query('insert into public.lineage_units(tribe_id,parent_id,unit_type,name_ar,normalized_name) values($1,$2,$3,$4,$5) returning id',[tribeId,parentId,type,name,canonicalName(name)]);
  const id=r.rows[0].id;
  await db.query("insert into public.lineage_seed_reviews(unit_id,source_id,review_status,raw_source_path,reviewer_note) values($1,$2,'needs_review',$3,$4)",[id,sourceId,'admin/manual/'+id,'إضافة جديدة تحتاج تحققًا قبل النشر']);
  if(type==='subclan'){
-  const major=await ancestorOfUnit(db,parentId,tribeId,'branch');
-  if(!major)throw new HttpError(400,'يلزم اختيار فرع رئيسي قبل إضافة الفخذ');
+  const major=registryParent;
   await db.query("insert into public.lineage_fakhths(unit_id,tribe_id,major_branch_id,source_id,raw_source_path,review_status) values($1,$2,$3,$4,$5,'needs_review')",[id,tribeId,major,sourceId,'admin/manual/'+id]);
  }
  if(type==='family'){
-  const fakhth=await ancestorOfUnit(db,parentId,tribeId,'subclan');
-  const found=await db.query('select 1 from public.lineage_fakhths where unit_id=$1 and tribe_id=$2',[fakhth,tribeId]);
-  if(!found.rowCount)throw new HttpError(409,'الفخذ غير مدخل في دليل الفروع؛ راجع توثيقه أولًا');
+  const fakhth=registryParent;
   await db.query("insert into public.lineage_family_fakhth_links(family_unit_id,tribe_id,fakhth_unit_id,source_id,raw_source_path,review_status) values($1,$2,$3,$4,$5,'needs_review')",[id,tribeId,fakhth,sourceId,'admin/manual/'+id]);
  }
  await journal(db,user,'genealogy_unit_created','lineage_units',id,{unitType:type,sourceId,parentId,needsReview:true});
+ return id;
 }
 async function changeUnit(db,user,form){
  const id=uuid(form.get('id'),true),name=requiredName(field(form,'name',150)),parent=uuid(form.get('parent_id'));
- const current=(await db.query('select id,tribe_id,parent_id,unit_type from public.lineage_units where id=$1 for update',[id])).rows[0];
+ const current=(await db.query('select l.id,l.tribe_id,l.parent_id,l.unit_type,exists(select 1 from public.lineage_fakhths f where f.unit_id=l.id) as registered_fakhth from public.lineage_units l where l.id=$1 for update',[id])).rows[0];
  if(!current)throw new HttpError(404,'وحدة النسب غير موجودة');
  if(parent===id)throw new HttpError(409,'لا يمكن جعل الوحدة أصلًا لنفسها');
  if(parent)await checkUnit(db,parent,current.tribe_id);
- if(parent!==current.parent_id){
-  const refs=await db.query('select 1 from public.lineage_units where parent_id=$1 limit 1',[id]);
-  if(refs.rowCount)throw new HttpError(409,'لا يمكن نقل وحدة تحتوي فروعًا؛ يلزم طلب إعادة هيكلة');
+ const parentChanged=parent!==current.parent_id;
+ const isFakhth=current.unit_type==='subclan'||current.registered_fakhth;
+ const updateFamilyLink=current.unit_type==='family'&&(parentChanged||form.get('ensure_fakhth')==='yes');
+ let registryParent;
+ if(updateFamilyLink||(parentChanged&&isFakhth)){
+  registryParent=await registrationParent(db,parent,current.tribe_id,current.unit_type);
+ }
+ if(parentChanged){
+  if(current.unit_type!=='family'){
+   const refs=await db.query('select 1 from public.lineage_units where parent_id=$1 limit 1',[id]);
+   if(refs.rowCount)throw new HttpError(409,'لا يمكن نقل فخذ يحتوي وحدات تابعة؛ يمكن تعديل اسمه أو نقل العائلات أولًا.');
+  }
   const found=await db.query('with recursive family(id,parent_id,path) as (select id,parent_id,array[id] from public.lineage_units where id=$1 union all select u.id,u.parent_id,f.path||u.id from family f join public.lineage_units u on u.id=f.parent_id where not u.id=any(f.path)) select 1 from family where id=$2 limit 1',[parent,id]);
   if(found.rowCount)throw new HttpError(409,'نقل الوحدة يؤدي إلى دورة في شجرة الأنساب');
-  if(current.unit_type==='family'){
-   const fakhth=await ancestorOfUnit(db,parent,current.tribe_id,'subclan');
-   if(!fakhth)throw new HttpError(409,'تغيير أصل العائلة يتطلب فخذًا صحيحًا');
-   await db.query("update public.lineage_family_fakhth_links set fakhth_unit_id=$2,review_status='needs_review',verified_at=null,verified_by=null where family_unit_id=$1",[id,fakhth]);
-  }
  }
  const match=await db.query('select 1 from public.lineage_units where tribe_id=$1 and parent_id is not distinct from $2 and normalized_name=$3 and id<>$4 limit 1',[current.tribe_id,parent,canonicalName(name),id]);
  if(match.rowCount)throw new HttpError(409,'يوجد اسم مطابق في هذه العائلة');
  await db.query('update public.lineage_units set name_ar=$2,normalized_name=$3,parent_id=$4 where id=$1',[id,name,canonicalName(name),parent]);
+ if(updateFamilyLink){
+  const link=await db.query(
+   "insert into public.lineage_family_fakhth_links(family_unit_id,tribe_id,fakhth_unit_id,source_id,raw_source_path,review_status) "+
+   "select $1,$2,$3,r.source_id,r.raw_source_path,'needs_review' from public.lineage_seed_reviews r where r.unit_id=$1 "+
+   "on conflict(family_unit_id) do update set fakhth_unit_id=excluded.fakhth_unit_id,review_status='needs_review',verified_at=null,verified_by=null",
+   [id,current.tribe_id,registryParent]);
+  if(!link.rowCount)throw new HttpError(409,'أضف مصدر توثيق للعائلة قبل تغيير الفخذ المرتبط بها.');
+ }
+ if(parentChanged&&isFakhth){
+  await db.query("update public.lineage_fakhths set major_branch_id=$2 where unit_id=$1",[id,registryParent]);
+ }
  await db.query("update public.lineage_seed_reviews set review_status='needs_review',verified_at=null,verified_by=null,reviewer_note=$2 where unit_id=$1",[id,'تعديل إداري يحتاج إعادة اعتماد']);
  await db.query("update public.lineage_fakhths set review_status='needs_review',verified_at=null,verified_by=null where unit_id=$1",[id]);
  await db.query("update public.lineage_family_fakhth_links set review_status='needs_review',verified_at=null,verified_by=null where family_unit_id=$1",[id]);
- await journal(db,user,'genealogy_unit_updated','lineage_units',id,{parentChanged:parent!==current.parent_id,needsReview:true});
+ await journal(db,user,'genealogy_unit_updated','lineage_units',id,{parentChanged,needsReview:true});
+ return id;
 }
 async function withdrawUnit(db,user,form){
  const id=uuid(form.get('id'),true);
@@ -479,7 +496,7 @@ async function deleteUnitDraft(db,user,form){
  const review=(await db.query('select review_status,raw_source_path from public.lineage_seed_reviews where unit_id=$1 for update',[id])).rows[0];
  if(!review||review.review_status!=='needs_review'||!String(review.raw_source_path).startsWith('admin/manual/'))
    throw new HttpError(409,'لا يجوز حذف وحدة معتمدة أو مستوردة؛ استخدم إيقاف النشر والمراجعة');
- const dep=await db.query('select 1 from public.lineage_units where parent_id=$1 union all select 1 from public.people where family_unit_id=$1 limit 1',[id]);
+ const dep=await db.query('select 1 from public.lineage_units where parent_id=$1 union all select 1 from public.people where family_unit_id=$1 union all select 1 from public.lineage_family_fakhth_links where fakhth_unit_id=$1 limit 1',[id]);
  if(dep.rowCount)throw new HttpError(409,'الوحدة تحتوي أفرادًا أو فروعًا؛ احفظ التسلسل واستخدم المراجعة');
  await db.query('delete from public.lineage_family_fakhth_links where family_unit_id=$1',[id]);
  await db.query('delete from public.lineage_fakhths where unit_id=$1',[id]);
@@ -505,8 +522,21 @@ export async function genealogyAction(user,form){
  if(!entry)throw new HttpError(404,'الإجراء المطلوب غير معروف');
  await permit(user,entry[0]);
  const db=await pool.connect();
- try{await db.query('begin');await entry[1](db,user,form);await db.query('commit');}
- catch(error){await db.query('rollback');throw error;}
+ try{
+  await db.query('begin');
+  if(['create_unit','edit_unit','withdraw_unit','delete_unit_draft'].includes(action)){
+   await db.query('select pg_advisory_xact_lock(723145, 1)');
+  }
+  const result=await entry[1](db,user,form);
+  await db.query('commit');
+  return result;
+ }
+ catch(error){
+  await db.query('rollback');
+  if(action==='delete_unit_draft'&&error?.code==='23503')
+   throw new HttpError(409,'ترتبط هذه الوحدة بسجلات أخرى. أوقف النشر بدل حذفها.');
+  throw error;
+ }
  finally{db.release();}
 }
 export async function genealogyIdentityLookup(user,req,form){

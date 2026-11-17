@@ -208,6 +208,13 @@ const OPERATIONS={
  grant_role:['roles','roles.assign',grantRole],
  revoke_role:['roles','roles.assign',revokeRole],
 };
+export async function lineageTreeAction(user,req,form){
+ verify(user,req,form.get('csrf'));
+ if(!['create_unit','edit_unit','withdraw_unit','delete_unit_draft'].includes(form.get('operation')))
+  throw new HttpError(400,'الإجراء غير متاح من شجرة النسب.');
+ return genealogyAction(user,form);
+}
+
 export async function adminAction(u,section,req,form){
  await guard(u);
  verify(u,req,form.get('csrf'));

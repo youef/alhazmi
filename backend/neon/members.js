@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 import { accountFromId, authorized, HttpError, route } from './shared.js';
 import { accessibleModules, readModule } from './api.js';
-import { ADMIN_SECTIONS, adminAction, adminData, csrfFor } from './admin.js';
+import { ADMIN_SECTIONS, adminAction, adminData, csrfFor, lineageTreeAction } from './admin.js';
 import { familyAction, familyAdminData, familySupervisorData } from './family-management.js';
 import { familyAdminView, familyMemberView } from './family-views.js';
 import { adminView } from './admin-views.js';
 import { genealogyIdentityLookup } from './genealogy-admin.js';
+import { lineageTreeData } from './lineage-tree-admin.js';
+import { lineageTreeView } from './lineage-tree-view.js';
 import { memberAuth } from './member-auth.js';
 import { authPage, dashboard, memberHome, moduleNames, modulePage, page, profilePage, portalScript } from './member-views.js';
 
@@ -195,6 +197,25 @@ export default {
         }
         const {data, filter} = await adminData(account, section, url);
         return html(adminView(section, user, data, filter, csrfFor(account, request), url.searchParams.get('done') === '1'));
+      }
+      if (path === '/dashboard/tree') {
+        if (request.method === 'POST') {
+          const form = await readForm(request);
+          try {
+            const id = await lineageTreeAction(account, request, form);
+            const params = new URLSearchParams({ done: '1' });
+            const tribe = form.get('tribe_id') || url.searchParams.get('tribe');
+            if (tribe) params.set('tribe', tribe);
+            if (id) params.set('unit', id);
+            return redirect(headers, '/dashboard/tree?' + params);
+          } catch (error) {
+            if (!(error instanceof HttpError) || error.status === 403) throw error;
+            const data = await lineageTreeData(account, url);
+            return html(lineageTreeView(data, url.searchParams, csrfFor(account,request), error.message), error.status);
+          }
+        }
+        const data = await lineageTreeData(account, url);
+        return html(lineageTreeView(data, url.searchParams, data.canManage ? csrfFor(account,request) : ''));
       }
       if (path === '/dashboard' && request.method === 'GET') {
         const [modules, isAdmin] = await Promise.all([accessibleModules(account), authorized(account, 'roles.view')]);
