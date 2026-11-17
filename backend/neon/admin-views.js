@@ -20,6 +20,18 @@ const icon=(name,size=22)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0
 const names={overview:'نظرة عامة',genealogy:'إدارة الأنساب والأفراد',members:'الأعضاء',kinship:'شجرة عائلتي',requests:'طلبات التغيير',services:'الخدمات',claims:'ربط السجلات',roles:'الأدوار والصلاحيات',supervisors:'مشرفو الأفخاذ والعائلات',audit:'سجل التدقيق',system:'حالة النظام'};
 const navOrder=['overview','genealogy','kinship','members','requests','services','claims','roles','supervisors','audit','system'];
 const css=`
+body.diwan-administration{
+ --surface:#fff;--canvas:#f3f7f4;--text:#18372a;--muted:#50695b;--line:#dce9e1;
+}
+.diwan-administration>header{background:#fff;color:#163b2a;border-bottom:1px solid var(--line)}
+.diwan-administration>header:before{display:none}
+.diwan-administration>header nav a,.diwan-administration>header nav .brand{color:#174c34}
+.diwan-administration .brand-mark{border-color:var(--line);background:#fff}
+.diwan-administration .diwan-public-utility{
+ display:flex;align-items:center;justify-content:space-between;gap:10px;
+ padding:8px max(20px,calc((100vw - 1210px)/2));background:#06432e;color:#fff;font-size:.77rem;
+}
+.diwan-administration .diwan-public-utility a{color:inherit;text-underline-offset:3px}
 .adm-root{--a:#076a45;--b:#075138;--sub:#6a7c72;--bd:#deebe3;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px;align-items:start}
 .adm-side{background:#fff;border:1px solid var(--bd);border-radius:20px;position:sticky;top:108px;padding:14px;box-shadow:0 14px 34px #06452a0a}
 .adm-side-title{padding:12px 13px 18px;border-bottom:1px solid var(--bd);margin-bottom:12px;color:#074a30;font-weight:900}
@@ -85,56 +97,42 @@ const css=`
 @media(prefers-reduced-motion:reduce){.adm-root *{scroll-behavior:auto}}
 
 
-/* Admin operations: warm editorial shell */
-.adm-root{--a:#a55339;--b:#38291d;--sub:#8a7564;--bd:#e6dacb;grid-template-columns:260px minmax(0,1fr);gap:18px}
-.adm-side{background:#30251c;color:#f7ebdd;border:1px solid #4c392d;border-radius:18px;top:90px;box-shadow:0 15px 40px #2c1c1730}
-.adm-side-title{color:#e3b987;border-bottom:1px solid #68503b}
-.adm-nav a{color:#eddbc8!important;border-radius:10px}.adm-nav a svg{color:#c49971}
-.adm-nav a[aria-current=page],.adm-nav a:hover{background:#a55339!important;color:#fff!important}
-.adm-nav a[aria-current=page] svg,.adm-nav a:hover svg{color:#fff}
-.adm-hero{background:linear-gradient(105deg,#2e231c,#62402c 62%,#a55c3c);min-height:220px;border:1px solid #ae8059;border-radius:22px}
-.adm-hero:after{border-color:#e8c49b42;box-shadow:0 0 0 42px #d8ae7d13,0 0 0 88px #ead1a911}
-.adm-eyebrow{color:#e3bc86}.adm-hero p{color:#f3ddc5}
-.adm-metric,.adm-card{background:#fffdfa;border-color:#e6dacb;border-radius:18px;box-shadow:0 9px 28px #4c301b12}
-.adm-metric-icon{background:#f4e5d6;color:#a55339}.adm-metric strong{color:#38291d}
-.adm-table th{background:#f6ede3;color:#705948}.adm-link,.adm-crumbs a{color:#a55339}
-@media(max-width:850px){.adm-root{grid-template-columns:minmax(0,1fr)}.adm-side{position:static}.adm-nav{display:flex!important;flex-wrap:nowrap!important;overflow:auto;gap:6px!important}.adm-nav a{white-space:nowrap}}
-
 /* Consistent Diwan administration layout across all management pages */
 .adm-main{min-width:0;display:block}
 .adm-main>.adm-crumbs{margin-block:3px 12px}
 .adm-main>.adm-card,.adm-main>.gen-shell{max-width:100%}
 .adm-side{overflow:hidden}
+.adm-nav a:focus-visible{outline-offset:-3px}
 .adm-side-title{font-size:1rem;letter-spacing:.01em}
 .adm-nav a{position:relative;transition:background .15s ease,color .15s ease;min-height:48px}
-.adm-nav a[aria-current=page]:before{content:"";position:absolute;inset-block:12px;inset-inline-start:0;width:3px;border-radius:6px;background:#f6d0a1}
+.adm-nav a[aria-current=page]:before{content:"";position:absolute;inset-block:12px;inset-inline-start:0;width:3px;border-radius:6px;background:#08754e}
 .adm-hero{display:flex;flex-direction:column;justify-content:center;min-height:175px}
 .adm-hero h1{display:flex;align-items:center;gap:11px;flex-wrap:wrap;line-height:1.3}
 .adm-metrics{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
 .adm-metric{transition:transform .15s ease,box-shadow .15s ease}
-.adm-metric:hover{transform:translateY(-2px);box-shadow:0 13px 30px #4c301b1c}
+.adm-metric:hover{transform:translateY(-2px);box-shadow:0 13px 30px #073d251c}
 .adm-card,.adm-metric,.adm-detail{overflow-wrap:anywhere}
 .adm-card{scroll-margin-top:20px}
-.adm-tools{padding:13px 14px;border-radius:13px;background:#f7f0e7;border:1px solid #eadac6}
+.adm-tools{padding:13px 14px;border-radius:13px;background:#f1f7f3;border:1px solid #deebe3}
 .adm-tools label{flex:1 1 220px;min-width:0}
 .adm-tools :is(input,select){width:100%;min-width:0}
-.adm-form :is(input,textarea,select){background:#fffdfa;border-color:#d8c4b0;color:#3d2a20;transition:border-color .14s}
+.adm-form :is(input,textarea,select){background:#ffffff;border-color:#b9cfc2;color:#17372a;transition:border-color .14s}
 .adm-form textarea{min-height:100px;resize:vertical}
-.adm-form :is(input,textarea,select):focus,.adm-tools :is(input,select):focus{outline:2px solid #af764e;outline-offset:1px}
-.adm-button{background:#9d5837;min-height:45px;padding-inline:17px}
-.adm-button:hover{background:#7e3e26}
-.adm-detail{background:#fff9f2;border-color:#e8d7c4}
-.adm-detail summary{color:#8f4b2e}
-.adm-note{background:#fff8ec;border-color:#ead8c1;color:#725844}
-.adm-table-wrap{border:1px solid #ecdfd0;border-radius:14px}
-.adm-table th{position:sticky;top:0;background:#f7eee4;z-index:1}
-.adm-table tbody tr:nth-child(2n){background:#fdf9f4}
-.adm-table tbody tr:hover{background:#f7ecde}
-.adm-pagination a{color:#8e502e}
+.adm-form :is(input,textarea,select):focus,.adm-tools :is(input,select):focus{outline:2px solid #08754e;outline-offset:1px}
+.adm-button{background:#086846;min-height:45px;padding-inline:17px}
+.adm-button:hover{background:#054b34}
+.adm-detail{background:#f7fbf8;border-color:#deebe3}
+.adm-detail summary{color:#075138}
+.adm-note{background:#f1f7f3;border-color:#deebe3;color:#3c5c4d}
+.adm-table-wrap{border:1px solid #deebe3;border-radius:14px}
+.adm-table th{position:sticky;top:0;background:#edf5ef;z-index:1}
+.adm-table tbody tr:nth-child(2n){background:#f8fbf9}
+.adm-table tbody tr:hover{background:#e9f5ed}
+.adm-pagination a{color:#075138}
 .adm-badge.good{background:#e9f4e8;color:#317044}
 .adm-badge.warn{background:#fff0d5;color:#9a692c}
 .adm-badge.bad{background:#fae7e2;color:#a34d37}
-.adm-root :is(a,button,summary,input,select,textarea):focus-visible{outline:3px solid #bf8855;outline-offset:2px}
+.adm-root :is(a,button,summary,input,select,textarea):focus-visible{outline:3px solid #08754e;outline-offset:2px}
 @media(max-width:850px){.adm-main>.adm-crumbs{padding-inline:3px}.adm-side{border-radius:14px}.adm-nav{scroll-snap-type:x proximity}.adm-nav a{scroll-snap-align:center}.adm-hero{min-height:145px}.adm-hero h1{font-size:1.4rem}}
 @media(max-width:500px){.adm-card{padding:14px}.adm-tools{padding:11px}.adm-metric{min-height:110px}.adm-table{font-size:.78rem}.adm-table th,.adm-table td{padding:10px 8px}}
 @media(prefers-reduced-motion:reduce){.adm-metric{transition:none}.adm-metric:hover{transform:none}}
@@ -288,8 +286,8 @@ function kinshipView(data) {
 export function adminView(section,user,data,filter,csrf,done=false){
  const title=names[section]||'الإدارة';
  const sidebar='<aside class="adm-side"><div class="adm-side-title">مركز إدارة الديوان</div><nav class="adm-nav" aria-label="أقسام الإدارة">'+navOrder.map(k=>'<a href="/admin/'+k+'" '+(k===section?'aria-current="page"':'')+'>'+icon(k,20)+e(names[k])+'</a>').join('')+'</nav></aside>';
- const description=section==='overview'?'مؤشرات مباشرة وإجراءات منظمة لإدارة عضوية الديوان ومحتواه وصلاحياته.': 'جميع العمليات الحساسة محمية بمراجعة الصلاحية وسجل تدقيق.';
- const hero='<div class="adm-crumbs"><a href="/dashboard">لوحة التحكم</a><span> / </span><a href="/admin">الإدارة</a><span> / </span><strong>'+e(title)+'</strong></div><header class="adm-hero"><span class="adm-eyebrow">DIWAN / MANAGEMENT CONSOLE</span><h1>'+icon(section,27)+' '+e(title)+'</h1><p>'+e(description)+'</p></header>';
+ const description=section==='genealogy'?'ابحث في سجل الأفراد، وراجع صلات القرابة، وأدر سجلات العائلات والأفخاذ.':section==='overview'?'مؤشرات مباشرة وإجراءات منظمة لإدارة عضوية الديوان ومحتواه وصلاحياته.': 'جميع العمليات الحساسة محمية بمراجعة الصلاحية وسجل تدقيق.';
+ const hero='<div class="adm-crumbs"><a href="/dashboard">لوحة التحكم</a><span> / </span><a href="/admin">الإدارة</a><span> / </span><strong>'+e(title)+'</strong></div><header class="adm-hero"><span class="adm-eyebrow">ديوان الحازمي · الإدارة</span><h1>'+icon(section,27)+' '+e(title)+'</h1><p>'+e(description)+'</p></header>';
  let content='';
  if(section==='overview')content=home(data);
  else if(section==='genealogy')content=genealogyView(data,csrf);
@@ -302,5 +300,5 @@ export function adminView(section,user,data,filter,csrf,done=false){
  else if(section==='audit')content=auditList(data,filter);
  else if(section==='system')content=systemView(data);
  const notice=done?'<div class="adm-notice" role="status">تم تنفيذ الإجراء وتسجيله في سجل التدقيق بنجاح.</div>':'';
- return page(title,'<style>'+css+'</style><div class="adm-root">'+sidebar+'<div class="adm-main">'+hero+notice+content+'</div></div>',true);
+ return page(title,'<style>'+css+'</style><div class="adm-root">'+sidebar+'<div class="adm-main">'+hero+notice+content+'</div></div>',true,{administration:true});
 }

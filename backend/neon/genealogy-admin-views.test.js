@@ -53,3 +53,17 @@ test('focused genealogy shows spouses and children with edit links and reported 
  assert.ok(html.includes(encodeURIComponent(wife.id)+'#gen-person-edit'));
  assert.ok(html.includes(encodeURIComponent(child.id)+'#gen-person-edit'));
 });
+
+test('registry pagination preserves filters and displays parents outside the picker',()=>{
+ const html=genealogyView({
+  people:[{id:'example',full_name_ar:'شخص تجريبي',father_name:'والد تجريبي',mother_name:'والدة تجريبية'}],
+  peoplePage:2,hasMorePeople:true,q:'Example & name',unitQ:'Family',
+  directory:[],directoryUnits:[],tribes:[],units:[],sources:[],stats:{},
+  canEditPeople:false,canEditUnits:false,
+ },'csrf-token-test');
+ assert.match(html,/والد تجريبي/);
+ assert.match(html,/والدة تجريبية/);
+ assert.match(html,/rel="prev" href="\/admin\/genealogy\?q=Example\+%26\+name&amp;unit_q=Family&amp;people_page=1#gen-people"/);
+ assert.match(html,/rel="next" href="[^"]*people_page=3#gen-people"/);
+ assert.doesNotMatch(html,/\?child_of=example/);
+});

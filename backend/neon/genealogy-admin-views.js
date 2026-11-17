@@ -88,17 +88,30 @@ function personWizard(data,csrf){
  '<label class="gen-check"><input name="allow_duplicate_name" type="checkbox" value="yes">أتفهم وجود أسماء متشابهة وأوافق على إنشاء شخص مختلف بعد التحقق.</label></div>';
  return form('create_tree',csrf,fields,'حفظ الفرد وشجرة أصوله');
 }
+function peoplePagination(data){
+ const page=data.peoplePage||1;
+ if(page===1&&!data.hasMorePeople)return '';
+ const url=number=>'/admin/genealogy?'+new URLSearchParams({
+  q:data.q||'',unit_q:data.unitQ||'',people_page:String(number),
+ })+'#gen-people';
+ return '<nav class="gen-pagination" aria-label="صفحات سجل الأفراد">'+
+   (page>1?'<a class="gen-compact-button" rel="prev" href="'+e(url(page-1))+'">السابقة</a>':'')+
+   '<span>الصفحة '+n(page)+'</span>'+
+   (data.hasMorePeople?'<a class="gen-compact-button" rel="next" href="'+e(url(page+1))+'">التالية</a>':'')+
+   '</nav>';
+}
 function personRows(data){
  if(!data.people.length)return '<p class="gen-muted">لا توجد نتائج مطابقة. ابحث باسم آخر أو أضف فردًا جديدًا.</p>';
  return '<div class="gen-scroll"><table class="gen-table"><thead><tr><th>الشخص</th><th>العائلة والأصول</th><th>الحالة</th><th>الإدارة</th></tr></thead><tbody>'+
  data.people.map(p=>{
-  const father=data.directory.find(x=>x.id===p.father_id)?.full_name_ar||'—';
-  const mother=data.directory.find(x=>x.id===p.mother_id)?.full_name_ar||'—';
+  const father=p.father_name||'—';
+  const mother=p.mother_name||'—';
   const url='/admin/genealogy?person_id='+encodeURIComponent(p.id)+'#gen-person-edit';
   return '<tr><td><strong>'+e(p.full_name_ar)+'</strong><br><small class="gen-small">'+e(gender[p.gender]||'')+' · '+e(p.identity_mask||'لا توجد هوية')+'</small></td>'+
     '<td>'+e(p.family_name||'عائلة غير محددة')+'<br><small class="gen-small">الأب: '+e(father)+'<br>الأم: '+e(mother)+'</small></td>'+
     '<td><span class="gen-pill">'+e(status[p.record_status]||p.record_status)+'</span></td>'+
-    '<td><div class="gen-action-group"><a class="gen-compact-button" href="'+e(url)+'">تعديل</a>'+'<a class="gen-compact-button" href="/admin/genealogy?child_of='+encodeURIComponent(p.id)+'#gen-tree-create">إضافة ابن/ابنة</a></div></td></tr>';
+    '<td>'+ (data.canEditPeople?'<div class="gen-action-group"><a class="gen-compact-button" href="'+e(url)+'">تعديل</a>'+
+    '<a class="gen-compact-button" href="/admin/genealogy?child_of='+encodeURIComponent(p.id)+'#gen-tree-create">إضافة ابن/ابنة</a></div>':'—')+'</td></tr>';
  }).join('')+'</tbody></table></div>';
 }
 const dateValue=value=>{
@@ -296,11 +309,16 @@ function editUnitCard(data,csrf){
 }
 export function genealogyView(data,csrf){
  const metrics=[
-  ['👤','الأفراد',data.stats.people],['🧬','وحدات النسب',data.stats.units],
-  ['🕰️','أفراد بانتظار المراجعة',data.stats.drafts],['📁','وحدات تحتاج مراجعة',data.stats.unit_reviews],
- ].map(([ico,label,value])=>'<article><span class="gen-count">'+ico+'</span><div><strong>'+n(value)+'</strong><small>'+e(label)+'</small></div></article>').join('');
+  ['الأفراد',data.stats.people],['الفروع والعائلات',data.stats.units],
+  ['مسودات الأفراد',data.stats.drafts],['وحدات قيد المراجعة',data.stats.unit_reviews],
+ ].map(([label,value])=>'<article><small>'+e(label)+'</small><strong>'+n(value)+'</strong></article>').join('');
+ const shortcuts='<nav class="gen-services" aria-label="خدمات سجل الأنساب">'+
+   '<a class="gen-compact-button" href="#gen-people">سجل الأفراد</a>'+
+   (data.canEditPeople?'<a class="gen-submit" href="#gen-tree-create">إضافة فرد</a>':'')+
+   '<a class="gen-compact-button" href="#gen-identity">البحث بالهوية</a>'+
+   '<a class="gen-compact-button" href="#gen-units">الفروع والعائلات</a></nav>';
  const identityBox=data.lookup?'<div class="gen-result" role="status">'+
-   (data.lookup.matched?'الهوية مسجلة باسم: '+e(data.lookup.record.full_name_ar)+' • '+e(data.lookup.record.masked_value||'رقم مقنّع')+' • الحالة: '+e(status[data.lookup.record.record_status]||data.lookup.record.record_status)+' <a href="/admin/genealogy?person_id='+encodeURIComponent(data.lookup.record.id)+'#gen-person-edit">فتح سجل الفرد</a>':
+   (data.lookup.matched?'الهوية مسجلة باسم: '+e(data.lookup.record.full_name_ar)+' • '+e(data.lookup.record.masked_value||'رقم مقنّع')+' • الحالة: '+e(status[data.lookup.record.record_status]||data.lookup.record.record_status)+(data.canEditPeople?' <a href="/admin/genealogy?person_id='+encodeURIComponent(data.lookup.record.id)+'#gen-person-edit">فتح سجل الفرد</a>':''):
    'لا يوجد تطابق لهذه الهوية في الفهرس الحالي. يمكن إضافة الشخص كمراجعة جديدة.')+
   '</div>':'';
  const identitySearch=form('lookup_identity',csrf,
@@ -315,19 +333,18 @@ export function genealogyView(data,csrf){
   '<label class="gen-wide">مصدر التوثيق<select name="source_id" required>'+options(data.sources,'id',s=>s.title+' · '+s.source_type,'','— اختر مصدرًا —')+'</select></label></div>'+
   '<p class="gen-muted">الفخذ يحتاج أصلًا من الفروع، والعائلة تحتاج فخذًا. السجلات الجديدة لا تُنشر قبل اعتمادها.</p>', 'إضافة الفخذ أو العائلة');
  return '<style>'+genealogyStyles+'</style><div class="gen-shell">'+
-  '<div class="gen-summary">'+metrics+'</div>'+
-  '<div class="gen-note"><strong>خصوصية وتوثيق:</strong><span>أرقام الهوية لا تُعرض بنص صريح، ويُحفظ رقمها مشفرًا مع بصمة مطابقة HMAC وآخر ٤ خانات فقط. الأفراد والأجداد الجدد ينشؤون بحالة «تحت المراجعة» وبعرض خاص. الحذف المسموح لا يشمل السجلات المعتمدة أو المرتبطة بنسب آخر.</span></div>'+
-  '<section class="gen-section"><div class="gen-section-head"><div class="gen-section-header"><span class="gen-section-icon">⌕</span><div><h2>البحث عن هوية مسجلة</h2><small>كشف التطابق دون إظهار الرقم الأصلي أو إضافته إلى عنوان الصفحة</small></div></div></div>'+
-    identityBox+identitySearch+'</section>'+
-  (data.canEditPeople?'<section class="gen-section" id="gen-tree-create"><div class="gen-section-head"><div class="gen-section-header"><span class="gen-section-icon">♧</span><div><h2>إضافة فرد ونسبه الكامل</h2><small>الفرد ← الأب والأم ← الجد والجدة من الجهتين</small></div></div></div>'+
+  shortcuts+'<div class="gen-summary">'+metrics+'</div>'+editPersonCard(data,csrf)+
+  '<section class="gen-section" id="gen-identity"><div class="gen-section-head"><div class="gen-section-header"><div><h2>البحث عن هوية مسجلة</h2><small>كشف التطابق دون إظهار الرقم الأصلي أو إضافته إلى عنوان الصفحة</small></div></div></div>'+
+    '<p class="gen-note">يتطلب البحث الرقم الكامل. يظهر الرقم مقنّعًا في النتيجة.</p>'+identityBox+identitySearch+'</section>'+
+  (data.canEditPeople?'<section class="gen-section" id="gen-tree-create"><div class="gen-section-head"><div class="gen-section-header"><div><h2>إضافة فرد ونسبه الكامل</h2><small>الفرد ← الأب والأم ← الجد والجدة من الجهتين</small></div></div></div>'+
    (data.childOf?'<div class="gen-result">إضافة نسل جديد للسجل: '+e(data.childOf.full_name_ar)+' — تم اختيار '+e(data.childOf.gender==='female'?'الأم':'الأب')+' تلقائيًا، ويمكن تعديله.</div>':'')+personWizard(data,csrf)+'</section>':'<div class="gen-note">تحتاج إذن تعديل الهويات لإضافة الأفراد وتعديلهم.</div>')+
-  '<section class="gen-section"><div class="gen-section-head"><div><h2>دليل الأفراد والتعديل والأرشفة</h2><small>بحث الاسم يعرض سجلات خاصة للإدارة فقط</small></div></div>'+
-   '<form method="get" action="/admin/genealogy" class="gen-search"><label>اسم الفرد<input type="search" maxlength="70" name="q" value="'+e(data.q)+'" placeholder="ابحث عن اسم أو لقب"></label>'+h('unit_q',data.unitQ)+
-    '<button type="submit">بحث</button><a class="gen-compact-button" href="/admin/genealogy">مسح</a></form>'+
-   personRows(data)+'</section>'+editPersonCard(data,csrf)+
-  '<section class="gen-section"><div class="gen-section-head"><div class="gen-section-header"><span class="gen-section-icon">♧</span><div><h2>إدارة الأفخاذ والعوائل</h2><small>إضافة وتعديل وربط الوحدات بالترتيب الأبوي الصحيح</small></div></div>'+
+  '<section class="gen-section" id="gen-people"><div class="gen-section-head"><div><h2>سجل الأفراد</h2></div></div>'+
+   '<form method="get" action="/admin/genealogy#gen-people" class="gen-search"><label>اسم الفرد<input type="search" maxlength="70" name="q" value="'+e(data.q)+'" placeholder="ابحث عن اسم أو لقب"></label>'+h('unit_q',data.unitQ)+
+    '<button type="submit">بحث</button><a class="gen-compact-button" href="/admin/genealogy?unit_q='+encodeURIComponent(data.unitQ||'')+'#gen-people">مسح</a></form>'+
+   personRows(data)+peoplePagination(data)+'</section>'+
+  '<section class="gen-section" id="gen-units"><div class="gen-section-head"><div class="gen-section-header"><div><h2>إدارة الأفخاذ والعوائل</h2><small>إضافة وتعديل وربط الوحدات بالترتيب الأبوي الصحيح</small></div></div>'+
    '<a class="gen-compact-button" href="https://youef.github.io/alhazmi/ar/lineage/" target="_blank" rel="noopener noreferrer">معاينة الدليل العام</a></div>'+
    (data.canEditUnits?'<details class="gen-details"><summary>＋ إضافة فخذ أو عائلة أو بيت جديد</summary>'+unitForm+'</details>':'<p class="gen-muted">إنشاء الوحدات يحتاج صلاحية إدارة هيكلة النسب.</p>')+
-   '<form method="get" action="/admin/genealogy" class="gen-search">'+h('q',data.q)+'<label>اسم الفخذ أو العائلة<input name="unit_q" type="search" maxlength="70" value="'+e(data.unitQ)+'" placeholder="تصفية وحدات النسب"></label><button type="submit">تصفية</button></form>'+
+   '<form method="get" action="/admin/genealogy#gen-units" class="gen-search">'+h('q',data.q)+'<label>اسم الفخذ أو العائلة<input name="unit_q" type="search" maxlength="70" value="'+e(data.unitQ)+'" placeholder="تصفية وحدات النسب"></label><button type="submit">تصفية</button></form>'+
    unitRows(data)+'</section>'+editUnitCard(data,csrf)+'</div>';
 }

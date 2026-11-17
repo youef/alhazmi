@@ -530,22 +530,35 @@ export async function genealogyData(user,url){
  await permit(user,'identity.read');
  const q=clip(url.searchParams.get('q'),70);
  const unitQ=clip(url.searchParams.get('unit_q'),70);
- const peopleSQL="select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.birth_place,p.biography,p.created_at,l.name_ar as family_name,"+
+ const requestedPage=clip(url.searchParams.get('people_page'),10);
+ const page=/^[1-9]\d{0,8}$/.test(requestedPage)?Number(requestedPage):1;
+ const pageSize=40;
+ const peopleSQL="select p.id,p.full_name_ar,p.gender,p.record_status,l.name_ar as family_name,"+
+  "father.full_name_ar as father_name,mother.full_name_ar as mother_name,"+
   "(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) as identity_mask "+
-  "from public.people p left join public.lineage_units l on l.id=p.family_unit_id where ($1='' or position(lower($1) in lower(p.full_name_ar))>0) order by p.created_at desc limit 120";
+  "from public.people p left join public.lineage_units l on l.id=p.family_unit_id "+
+  "left join public.people father on father.id=p.father_id left join public.people mother on mother.id=p.mother_id "+
+  "where ($1='' or position(lower($1) in lower(p.full_name_ar))>0) "+
+  "order by p.created_at desc,p.id desc limit $2 offset $3";
  const focusPersonId=uuid(url.searchParams.get('person_id'));
  const childOfId=uuid(url.searchParams.get('child_of'));
  const focusUnitId=uuid(url.searchParams.get('unit_id'));
- const [tribes,people,units,sources,stats,directory,directoryUnits,focusPerson,focusUnit]=await Promise.all([
+ const [tribes,people,units,sources,stats,directory,directoryUnits,focusPerson,focusUnit,selectedPeople]=await Promise.all([
   pool.query('select id,name_ar from public.tribes order by name_ar limit 40'),
-  pool.query(peopleSQL,[q]),
+  pool.query(peopleSQL,[q,pageSize+1,(page-1)*pageSize]),
   pool.query("select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,r.review_status from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id where ($1='' or position(lower($1) in lower(l.name_ar))>0) order by l.name_ar limit 550",[unitQ]),
   pool.query('select id,tribe_id,title,source_type from public.sources order by created_at desc limit 60'),
   pool.query("select (select count(*) from public.people) people,(select count(*) from public.people where record_status='under_review') drafts,(select count(*) from public.lineage_units) units,(select count(*) from public.lineage_seed_reviews where review_status='needs_review') unit_reviews"),
   pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) identity_mask from public.people p where p.record_status<>'archived' order by p.full_name_ar limit 400"),
   pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units order by name_ar limit 1200'),
   focusPersonId?pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.birth_date,p.death_date,p.living_status,p.birth_place,p.biography,pp.* from public.people p left join public.person_private pp on pp.person_id=p.id where p.id=$1 limit 1",[focusPersonId]):Promise.resolve({rows:[]}),
-  focusUnitId?pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units where id=$1 limit 1',[focusUnitId]):Promise.resolve({rows:[]})
+  focusUnitId?pool.query('select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units where id=$1 limit 1',[focusUnitId]):Promise.resolve({rows:[]}),
+  (focusPersonId||childOfId)?pool.query(
+    "select p.id,p.full_name_ar,p.gender,p.record_status from public.people p where "+
+    "(p.id=$1 and p.record_status<>'archived') or p.id in "+
+    "(select father_id from public.people where id=$2 union select mother_id from public.people where id=$2)",
+    [childOfId,focusPersonId]
+  ):Promise.resolve({rows:[]})
  ]);
  const permissions=await Promise.all(['identity.edit','lineage.structure_apply'].map(key=>authorized(user,key)));
  // Fetch only one focused person's family graph, never all genealogy profiles.
@@ -565,5 +578,10 @@ export async function genealogyData(user,url){
  if(focused){
    for(const key of ['national_id_ciphertext','phone_ciphertext','email_ciphertext','national_address_ciphertext','employer_ciphertext','job_title_ciphertext','private_notes_ciphertext'])delete focused[key];
  }
- return {tribes:tribes.rows,people:people.rows,directory:directory.rows,childOf:directory.rows.find(p=>p.id===childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows,focusedPerson:focused,relations:{ancestors:ancestors.rows,spouses:spouses.rows,children:children.rows},focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
+ const parentOptions=new Map(directory.rows.map(person=>[person.id,person]));
+ for(const person of selectedPeople.rows){
+   if(!parentOptions.has(person.id))parentOptions.set(person.id,person);
+ }
+ return {tribes:tribes.rows,people:people.rows.slice(0,pageSize),peoplePage:page,hasMorePeople:people.rows.length>pageSize,
+   directory:[...parentOptions.values()],childOf:parentOptions.get(childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows,focusedPerson:focused,relations:{ancestors:ancestors.rows,spouses:spouses.rows,children:children.rows},focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0],canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ};
 }
