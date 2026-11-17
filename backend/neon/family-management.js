@@ -5,6 +5,8 @@ import { csrfFor } from './admin.js';
 import { verifyPersonRecord, linkVerifiedAccount, verifyFamilyConnection, shareOwnName, revokeOwnNameShare } from './family-finalization.js';
 
 const roleKeys=['diwan_fakhth_supervisor','diwan_family_supervisor','diwan_parent_supervisor'];
+const leaderKeys=['diwan_fakhth_leader','diwan_family_leader'];
+const scopedRoleKeys=[...roleKeys,...leaderKeys];
 const relations=['self','spouse','son','daughter','father','mother','grandson','granddaughter','paternal_uncle','paternal_aunt','maternal_uncle','maternal_aunt','paternal_grandfather','paternal_grandmother','maternal_grandfather','maternal_grandmother','guardian'];
 const txt=(v,max=200)=>typeof v==='string'?v.trim().slice(0,max):'';
 const id=(v)=>{if(typeof v!=='string'||!isId(v))throw new HttpError(400,'Invalid identifier');return v;};
@@ -17,7 +19,10 @@ const adminCheck=async user=>{if(!await authorized(user,'roles.view'))reject('Ad
 const audit=async(db,user,kind,entity,idValue,after)=>db.query('insert into public.audit_log(actor_user_id,operation,entity_table,entity_id,after_data) values($1,$2,$3,$4,$5::jsonb)',[user.id,kind,entity,idValue,JSON.stringify(after)]);
 const grantRows=async user=>(await pool.query(
  "select a.scope_type,a.scope_unit_id,a.scope_person_id,r.role_key from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id where a.user_id=$1 and r.role_key=any($2::text[]) and r.role_state='active' and a.approved_at is not null and a.revoked_at is null and a.starts_at<=now() and (a.expires_at is null or a.expires_at>now())",
- [user.id,roleKeys])).rows;
+ [user.id,scopedRoleKeys])).rows.map(grant=>({
+  ...grant,
+  role_key:leaderKeys.includes(grant.role_key)?grant.role_key.replace('_leader','_supervisor'):grant.role_key,
+ }));
 const verifiedEmail=async user=>{
  const result=await pool.query('select email,"emailVerified" verified from neon_auth."user" where id=$1 and banned is distinct from true',[user.id]);
  if(!result.rows[0]?.verified)reject('A verified email is required');
@@ -52,7 +57,7 @@ async function inviteData(user){
   pool.query('select id,invited_email,invited_name,role_key,fakhth_unit_id,family_unit_id,parent_person_id,created_at,accepted_at,expires_at,revoked_at from public.diwan_supervisor_invitations order by created_at desc limit 70'),
   pool.query('select id,email,name from neon_auth."user" where "emailVerified" is true order by "createdAt" desc limit 100'),
   pool.query("select q.id,q.proposed_name_ar,q.relationship,q.status,q.created_at,q.proposed_notes,q.proposed_details,q.proposed_gender,q.proposed_birth_date,q.identifier_type,q.identifier_last4,q.created_person_id,q.anchor_person_id,q.linked_person_id,q.lineage_verified_at,u.email,l.name_ar family_name,p.name_ar fakhth_name,coalesce(created.record_status,'') person_record_status,prior.full_name_ar matched_person_name from public.diwan_family_relation_requests q join neon_auth.\"user\" u on u.id=q.submitter_id join public.lineage_units l on l.id=q.family_unit_id join public.lineage_units p on p.id=q.fakhth_unit_id left join public.people created on created.id=q.created_person_id left join public.people prior on prior.id=q.linked_person_id order by q.created_at desc limit 70"),
-  pool.query("select a.id,a.user_id,a.scope_type,a.scope_unit_id,a.scope_person_id,a.expires_at,u.email,r.name_ar role_name from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id join neon_auth.\"user\" u on u.id=a.user_id where r.role_key=any($1::text[]) and a.revoked_at is null and a.approved_at is not null order by a.created_at desc limit 80",[roleKeys])
+  pool.query("select a.id,a.user_id,a.scope_type,a.scope_unit_id,a.scope_person_id,a.expires_at,u.email,r.name_ar role_name from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id join neon_auth.\"user\" u on u.id=a.user_id where r.role_key=any($1::text[]) and a.revoked_at is null and a.approved_at is not null order by a.created_at desc limit 80",[scopedRoleKeys])
  ]);
  return {fakhths:fakhths.rows,families:families.rows,parents:parents.rows,invitations:invitations.rows,accounts:accounts.rows,queue:queue.rows,activeSupervisors:activeSupervisors.rows};
 }
@@ -62,8 +67,8 @@ async function familyData(user){
  const grants=await grantRows(user);
  const invites=(await pool.query("select id,role_key,invited_email,created_at,expires_at from public.diwan_supervisor_invitations where invited_email=$1 and accepted_at is null and revoked_at is null and expires_at>now() order by created_at desc",[email])).rows;
  const selected=(await pool.query(
- "select f.family_unit_id id,l.name_ar name,f.fakhth_unit_id fakhth_id,k.name_ar fakhth_name from public.lineage_family_fakhth_links f join public.lineage_units l on l.id=f.family_unit_id join public.lineage_units k on k.id=f.fakhth_unit_id where f.tribe_id=$1 order by k.name_ar,l.name_ar limit 450",
- ['9425755a-ccfa-568d-4128-a942618420d7'])).rows;
+ "select f.family_unit_id id,l.name_ar name,f.fakhth_unit_id fakhth_id,k.name_ar fakhth_name from public.lineage_family_fakhth_links f join public.lineage_units l on l.id=f.family_unit_id join public.lineage_units k on k.id=f.fakhth_unit_id where ($1::uuid is null or f.tribe_id=$1) order by k.name_ar,l.name_ar limit 450",
+ [admin?null:user.tribe_id||null])).rows;
  const families=admin?selected:selected.filter(f=>grants.some(g=>
   g.role_key==='diwan_fakhth_supervisor'&&g.scope_unit_id===f.fakhth_id&&g.scope_type==='unit'
   ||g.role_key==='diwan_family_supervisor'&&g.scope_unit_id===f.id&&g.scope_type==='family'));
@@ -135,7 +140,7 @@ async function revokeSupervision(db,user,form){
  const assignment=id(txt(form.get('assignment'),50));
  const result=await db.query(
  "update public.user_custom_role_assignments a set revoked_at=now() from public.custom_roles r where a.id=$1 and a.role_id=r.id and r.role_key=any($2::text[]) and a.revoked_at is null returning a.id,a.user_id",
- [assignment,roleKeys]);
+ [assignment,scopedRoleKeys]);
  if(!result.rows.length)reject('Active supervisor assignment not found',409);
  await audit(db,user,'diwan_supervisor_assignment_revoked','user_custom_role_assignments',assignment,{targetUserId:result.rows[0].user_id});
 }

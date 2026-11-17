@@ -26,8 +26,8 @@ export async function linkVerifiedAccount(db,user,form){
  const account=(await db.query('select id from neon_auth."user" where id=$1 and "emailVerified" is true and banned is distinct from true',[userId])).rows[0];
  if(!account)throw new HttpError(403,'User email must be verified');
  await db.query('select auth.link_verified_neon_user($1::uuid)',[userId]);
- const r=await db.query("insert into public.user_profiles(user_id,person_id,account_status) values($1,$2,'active') on conflict(user_id) do update set person_id=excluded.person_id,account_status='active' where user_profiles.person_id is null or user_profiles.person_id=excluded.person_id returning user_id",[userId,personId]);
- if(!r.rows.length)throw new HttpError(409,'The account is already tied to a different person; a separate correction process is required');
+ const r=await db.query("insert into public.user_profiles(user_id,person_id,account_status) values($1,$2,'active') on conflict(user_id) do update set person_id=excluded.person_id,account_status='active' where (user_profiles.person_id is null or user_profiles.person_id=excluded.person_id) and user_profiles.account_status not in ('suspended','frozen','archived') returning user_id",[userId,personId]);
+ if(!r.rows.length)throw new HttpError(409,'الحساب موقوف أو مرتبط بفرد آخر. راجع حالة العضوية قبل الربط.');
  await journal(db,user,'diwan_verified_user_person_link','user_profiles',personId,{targetAccount:userId,note});
  await db.query("insert into public.notifications(user_id,category,title,body,related_record_id) values($1,'membership','تم ربط حسابك بسجل نسب موثّق','راجع ملفك الشخصي ومهامك في بوابة الديوان.',$2)",[userId,personId]);
 }

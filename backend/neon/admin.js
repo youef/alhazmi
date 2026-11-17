@@ -1,6 +1,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { authorized, HttpError, isId, pool } from './shared.js';
+import { linkVerifiedAccount } from './family-finalization.js';
 import { genealogyAction, genealogyData } from './genealogy-admin.js';
 
 export const ADMIN_SECTIONS=['overview','genealogy','kinship','members','requests','services','claims','roles','audit','system'];
@@ -68,10 +69,39 @@ export async function adminData(u,section,url){
   return {filter,data:{viewerId:profile.rows[0]?.person_id||null,people:people.rows,marriages:marriages.rows}};
  }
  if(section==='members'){
-  const where=" where ($1='' or position(lower($1) in lower(coalesce(u.email,'')||' '||coalesce(u.name,'')))>0)";
-  return {filter,data:await list(`select u.id,u.name,u.email,u."emailVerified" verified,u."createdAt" created_at,coalesce(p.account_status,'pending') account_status,
-   exists(select 1 from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id where a.user_id=u.id and r.is_system and a.scope_type='system' and a.revoked_at is null and a.approved_at is not null) is_admin
-   from neon_auth."user" u left join public.user_profiles p on p.user_id=u.id`+where+' order by u."createdAt" desc,u.id desc','select count(*) total from neon_auth."user" u'+where,[q],page)};
+  const fakhth=isId(url.searchParams.get('fakhth')||'')?url.searchParams.get('fakhth'):'';
+  const families=fakhth?(await pool.query('select l.id,l.name_ar from public.lineage_family_fakhth_links f join public.lineage_units l on l.id=f.family_unit_id where f.fakhth_unit_id=$1 order by l.name_ar,l.id',[fakhth])).rows:[];
+  const family=families.find(item=>item.id===url.searchParams.get('family'))?.id||'';
+  const person=isId(url.searchParams.get('person')||'')?url.searchParams.get('person'):'';
+  Object.assign(filter,{fakhth,family,person});
+  const from=' from neon_auth."user" u left join public.user_profiles p on p.user_id=u.id '+
+   'full join public.people pe on pe.id=p.person_id '+
+   'left join public.lineage_family_fakhth_links lf on lf.family_unit_id=pe.family_unit_id '+
+   'left join public.lineage_units family on family.id=pe.family_unit_id '+
+   'left join public.lineage_units fakhth on fakhth.id=lf.fakhth_unit_id';
+  const where=" where (u.id is not null or ($1<>'' or $2<>'' or $3<>'' or $4<>'') and pe.record_status<>'archived')"+
+   " and ($1='' or position(lower($1) in lower(concat_ws(' ',u.email,u.name,p.display_name,pe.full_name_ar)))>0)"+
+   " and (nullif($2,'')::uuid is null or lf.fakhth_unit_id=nullif($2,'')::uuid)"+
+   " and (nullif($3,'')::uuid is null or pe.family_unit_id=nullif($3,'')::uuid)"+
+   " and (nullif($4,'')::uuid is null or pe.id=nullif($4,'')::uuid)"+
+   " and ($5='' or coalesce(p.account_status,'pending')=$5)";
+  const [data,fakhths,canManage,canAssign,canIdentity,canLink]=await Promise.all([
+   list(`select u.id,u.name,u.email,u."emailVerified" verified,u."createdAt" created_at,u.banned,
+    p.display_name,coalesce(p.account_status,'pending') account_status,pe.id person_id,pe.full_name_ar,pe.record_status,
+    family.name_ar family_name,fakhth.name_ar fakhth_name,lf.fakhth_unit_id,
+    exists(select 1 from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id where a.user_id=u.id and r.is_system and a.scope_type='system' and a.revoked_at is null and a.approved_at is not null) is_admin
+    `+from+where+' order by u."createdAt" desc nulls last,pe.full_name_ar,u.id,pe.id','select count(*) total'+from+where,[q,fakhth,family,person,status],page),
+   pool.query('select l.id,l.name_ar from public.lineage_fakhths f join public.lineage_units l on l.id=f.unit_id order by l.name_ar,l.id'),
+   authorized(u,'roles.manage'),authorized(u,'roles.assign'),authorized(u,'identity.read'),authorized(u,'identity.edit'),
+  ]);
+  const ids=data.rows.flatMap(row=>row.id?[row.id]:[]);
+  const assignments=canAssign&&ids.length?(await pool.query(`select a.id,a.user_id,r.name_ar,l.name_ar scope_name,a.expires_at
+   from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id
+   left join public.lineage_units l on l.id=a.scope_unit_id
+   where a.user_id=any($1::uuid[]) and not r.is_system and a.revoked_at is null and a.approved_at is not null
+   and r.role_state='active' and a.starts_at<=now() and (a.expires_at is null or a.expires_at>now()) order by a.approved_at desc`,[ids])).rows:[];
+  const customRoles=canAssign?(await pool.query("select id,name_ar from public.custom_roles where not is_system and role_state='active' and max_scope='tribe' and tribe_id is null order by name_ar,id")).rows:[];
+  return {filter,data:{...data,customRoles,fakhths:fakhths.rows,families,canManage,canAssign,canIdentity,canLink,assignments,actorId:u.id}};
  }
  if(section==='requests'){
   await guard(u,'approval.review');
@@ -154,16 +184,82 @@ async function changeService(db,u,f){
  if(!r.rows.length)throw new HttpError(409,'Service has changed');
  await auditWrite(db,u,'admin_service_status_changed',{id,previous:expected,next});
 }
+async function managedMember(db,u,id){
+ if(id===u.id)throw new HttpError(403,'لا يمكن تعديل حسابك من إدارة الأعضاء.');
+ await db.query('select pg_advisory_xact_lock(hashtextextended($1, 481023))',[id]);
+ const exists=await db.query('select id from neon_auth."user" where id=$1 and "emailVerified" is true and banned is distinct from true',[id]);
+ if(!exists.rows.length)throw new HttpError(404,'الحساب غير متاح أو بريده غير مؤكّد.');
+ const protectedUser=await db.query("select 1 from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id where a.user_id=$1 and r.is_system and a.scope_type='system' and a.revoked_at is null and a.approved_at is not null limit 1",[id]);
+ if(protectedUser.rows.length)throw new HttpError(403,'حساب مدير النظام محمي.');
+}
 async function changeMember(db,u,f){
  const id=uid(f,'id'),state=clip(f.get('state'),20);
- if(!['suspended','active'].includes(state)||id===u.id||f.get('confirm')!=='yes')throw new HttpError(403,'Cannot change this account without explicit confirmation');
- const exists=await db.query('select id from neon_auth."user" where id=$1 and "emailVerified" is true and banned is distinct from true',[id]);
- if(!exists.rows.length)throw new HttpError(404,'Verified member not found');
- const protectedUser=await db.query("select 1 from public.user_custom_role_assignments a join public.custom_roles r on r.id=a.role_id where a.user_id=$1 and r.is_system and a.scope_type='system' and a.revoked_at is null and a.approved_at is not null limit 1",[id]);
- if(protectedUser.rows.length)throw new HttpError(403,'System administrators cannot be suspended here');
+ if(!['suspended','active','frozen','archived'].includes(state)||f.get('confirm')!=='yes')
+  throw new HttpError(403,'أكّد تغيير حالة العضوية.');
+ await managedMember(db,u,id);
  await db.query('select auth.link_verified_neon_user($1::uuid)',[id]);
  await db.query('insert into public.user_profiles(user_id,account_status) values($1,$2) on conflict(user_id) do update set account_status=excluded.account_status',[id,state]);
+ if(state==='archived')await db.query(`update public.user_custom_role_assignments a set revoked_at=now()
+  from public.custom_roles r where a.user_id=$1 and a.role_id=r.id and not r.is_system and a.revoked_at is null`,[id]);
  await auditWrite(db,u,'admin_member_status_changed',{newState:state},id);
+}
+async function editMember(db,u,f){
+ const id=uid(f,'id'),name=clip(f.get('display_name'),100);
+ if(name.length<3)throw new HttpError(400,'أدخل اسم عرض من ثلاثة أحرف على الأقل.');
+ await managedMember(db,u,id);
+ await db.query('select auth.link_verified_neon_user($1::uuid)',[id]);
+ await db.query('insert into public.user_profiles(user_id,display_name) values($1,$2) on conflict(user_id) do update set display_name=excluded.display_name',[id,name]);
+ await auditWrite(db,u,'admin_member_display_name_changed',{},id);
+}
+async function addMember(db,u,f){
+ const email=clip(f.get('email'),254).toLowerCase();
+ const account=(await db.query('select id from neon_auth."user" where lower(email)=$1 and "emailVerified" is true and banned is distinct from true',[email])).rows[0];
+ if(!account)throw new HttpError(404,'يجب أن يسجل العضو ويؤكد بريده أولًا.');
+ await managedMember(db,u,account.id);
+ const form=new URLSearchParams({account:account.id,person:uid(f,'person'),note:clip(f.get('note'),600)});
+ try{await linkVerifiedAccount(db,u,form);}
+ catch(error){
+  if(error?.code==='23505')throw new HttpError(409,'هذا الفرد مرتبط بحساب آخر.');
+  throw error;
+ }
+}
+async function grantMemberScope(db,u,f){
+ const id=uid(f,'id'),kind=clip(f.get('scope'),20),days=Number(f.get('duration_days'));
+ const roleKeys={family:'diwan_family_supervisor',fakhth:'diwan_fakhth_supervisor',parent:'diwan_parent_supervisor',
+  family_leader:'diwan_family_leader',fakhth_leader:'diwan_fakhth_leader'};
+ if((!Object.hasOwn(roleKeys,kind)&&kind!=='custom')||![30,90,365].includes(days))throw new HttpError(400,'اختر دورًا ونطاقًا ومدة صالحة.');
+ await managedMember(db,u,id);
+ const profile=(await db.query(`select p.person_id,pe.tribe_id,pe.family_unit_id,lf.fakhth_unit_id
+  from public.user_profiles p join public.people pe on pe.id=p.person_id
+  join public.lineage_family_fakhth_links lf on lf.family_unit_id=pe.family_unit_id
+  where p.user_id=$1 and p.account_status='active' and pe.record_status='verified' for update of p`,[id])).rows[0];
+ if(!profile)throw new HttpError(409,'يجب تفعيل العضو وربطه بسجل موثّق داخل عائلة مرتبطة بفخذ.');
+ if(kind==='custom'){
+  return grantRole(db,u,new URLSearchParams({role:uid(f,'custom_role'),target:id,tribe:profile.tribe_id,duration_days:String(days)}));
+ }
+ const role=(await db.query("select id from public.custom_roles where role_key=$1 and not is_system and role_state='active'",[roleKeys[kind]])).rows[0];
+ if(!role)throw new HttpError(409,'دور الإشراف غير متاح.');
+ const scope=kind.startsWith('fakhth')?'unit':kind==='parent'?'self':'family';
+ const unit=scope==='unit'?profile.fakhth_unit_id:scope==='family'?profile.family_unit_id:null;
+ const person=kind==='parent'?profile.person_id:null;
+ const existing=await db.query(`select 1 from public.user_custom_role_assignments where user_id=$1 and role_id=$2
+  and scope_type=$3 and scope_unit_id is not distinct from $4::uuid and scope_person_id is not distinct from $5::uuid
+  and revoked_at is null and (expires_at is null or expires_at>now())`,[id,role.id,scope,unit,person]);
+ if(existing.rows.length)throw new HttpError(409,'لهذا العضو تفويض سارٍ في النطاق نفسه.');
+ await db.query(`insert into public.user_custom_role_assignments(user_id,role_id,scope_type,scope_unit_id,scope_person_id,
+  assigned_by,approved_by,approved_at,expires_at,reason)
+  values($1,$2,$3,$4,$5,$6,$6,now(),now()+make_interval(days=>$7),'Scoped supervision from member registry')`,
+  [id,role.id,scope,unit,person,u.id,days]);
+ await auditWrite(db,u,'admin_member_supervision_granted',{role:role.id,scope,unit,person,days},id);
+}
+async function revokeMemberScope(db,u,f){
+ const member=uid(f,'member'),assignment=uid(f,'id');
+ if(f.get('confirm')!=='yes')throw new HttpError(400,'أكّد إلغاء التفويض.');
+ await managedMember(db,u,member);
+ const result=await db.query(`update public.user_custom_role_assignments a set revoked_at=now() from public.custom_roles r
+  where a.id=$1 and a.user_id=$2 and a.role_id=r.id and not r.is_system and a.revoked_at is null returning a.id`,[assignment,member]);
+ if(!result.rows.length)throw new HttpError(409,'التفويض غير متاح أو أُلغي سابقًا.');
+ await auditWrite(db,u,'admin_member_supervision_revoked',{assignment},member);
 }
 async function createRole(db,u,f){
  const key=clip(f.get('key'),64),name=clip(f.get('name'),100);
@@ -204,6 +300,10 @@ const OPERATIONS={
  create_service:['services','approval.configure',createService],
  review_service:['services','approval.review',reviewService],
  change_member:['members','roles.manage',changeMember],
+ edit_member:['members','roles.manage',editMember],
+ add_member:['members','identity.edit',addMember],
+ grant_member_scope:['members','roles.assign',grantMemberScope],
+ revoke_member_scope:['members','roles.assign',revokeMemberScope],
  create_role:['roles','roles.manage',createRole],
  grant_role:['roles','roles.assign',grantRole],
  revoke_role:['roles','roles.assign',revokeRole],

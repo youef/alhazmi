@@ -187,6 +187,15 @@ export default {
         if (!ADMIN_SECTIONS.includes(section)) return html(page('الصفحة غير موجودة', '<p>القسم الإداري غير موجود.</p>', true), 404);
         if (request.method === 'POST') {
           const submitted=await readForm(request);
+          if(section==='members' && submitted.get('operation')==='lookup_member_identity'){
+            const result=await genealogyIdentityLookup(account,request,submitted);
+            const selected=new URL(url);
+            if(result.matched)selected.searchParams.set('person',result.record.id);
+            const {data,filter}=await adminData(account,section,selected);
+            if(!result.matched){data.rows=[];data.total=0;}
+            data.identityResult=result;
+            return html(adminView(section,user,data,filter,csrfFor(account,request),false));
+          }
           if(section==='genealogy' && submitted.get('operation')==='lookup_identity'){
             const result=await genealogyIdentityLookup(account,request,submitted);
             const {data,filter}=await adminData(account,section,url);

@@ -70,7 +70,7 @@ const css=`
 .adm-error{background:#fff0ef;color:#a33c38}
 .adm-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:7px;max-height:340px;overflow:auto;padding:10px;border:1px solid var(--bd);border-radius:12px}
 .adm-options label{display:flex;gap:7px;align-items:center;min-height:36px;font-weight:500}
-.adm-options input{min-height:auto;width:17px;accent-color:var(--a)}
+.adm-options input,.adm-form input[type=checkbox]{min-height:auto;width:17px;accent-color:var(--a)}
 .adm-pagination{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;margin-top:16px}
 .adm-page-link{padding:7px 12px;border:1px solid var(--bd);border-radius:10px;text-decoration:none}
 .adm-page-link:hover{background:#e9f7ee}
@@ -126,9 +126,9 @@ const css=`
 @media(prefers-reduced-motion:reduce){.adm-metric{transition:none}.adm-metric:hover{transform:none}}
 
 `;
-const statusLabels={active:'نشط',pending:'بانتظار التفعيل',suspended:'موقوف',submitted:'مقدّم',triage:'فرز',needs_evidence:'يتطلب مستندات',approved:'معتمد',rejected:'مرفوض',draft:'مسودة',retired:'مؤرشف',review:'قيد المراجعة',in_review:'قيد المراجعة',completed:'مكتمل',cancelled:'ملغى'};
+const statusLabels={active:'نشط',pending:'بانتظار التفعيل',suspended:'موقوف',frozen:'مجمّد',archived:'مؤرشف',submitted:'مقدّم',triage:'فرز',needs_evidence:'يتطلب مستندات',approved:'معتمد',rejected:'مرفوض',draft:'مسودة',retired:'مؤرشف',review:'قيد المراجعة',in_review:'قيد المراجعة',completed:'مكتمل',cancelled:'ملغى'};
 const status=v=>{
- const type=['active','approved','completed','success'].includes(v)?'good':['rejected','suspended','failed'].includes(v)?'bad':['submitted','triage','needs_evidence','pending','review','in_review'].includes(v)?'warn':'';
+ const type=['active','approved','completed','success'].includes(v)?'good':['rejected','suspended','frozen','archived','failed'].includes(v)?'bad':['submitted','triage','needs_evidence','pending','review','in_review'].includes(v)?'warn':'';
  return '<span class="adm-badge '+type+'">'+e(statusLabels[v]||v||'—')+'</span>';
 };
 const card=(title,body,extra='')=>'<section class="adm-card"><div class="adm-topline"><h2>'+e(title)+'</h2>'+extra+'</div>'+body+'</section>';
@@ -141,7 +141,7 @@ const form=(section,csrf,op,fields,button='حفظ التغيير',danger=false)=
 const pager=(section,filter,data)=>{
  if(!data||data.total<=data.limit)return '';
  const pages=Math.ceil(data.total/data.limit);
- const url=p=>'/admin/'+section+'?page='+p+'&q='+encodeURIComponent(filter.q)+'&status='+encodeURIComponent(filter.status);
+ const url=p=>'/admin/'+section+'?'+new URLSearchParams(Object.entries({...filter,page:p}).filter(([,value])=>value));
  return '<div class="adm-pagination"><span class="adm-muted">صفحة '+num(data.page)+' من '+num(pages)+' • '+num(data.total)+' سجل</span><span class="adm-chiprow">'+(data.page>1?'<a class="adm-page-link" href="'+e(url(data.page-1))+'">السابق</a>':'')+(data.page<pages?'<a class="adm-page-link" href="'+e(url(data.page+1))+'">التالي</a>':'')+'</span></div>';
 };
 const filters=(section,filter,options=[])=>'<form method="get" action="/admin/'+section+'" class="adm-tools"><label>بحث<input type="search" name="q" value="'+e(filter.q)+'" placeholder="ابحث بالاسم أو البريد..."></label>'+ (options.length?'<label>الحالة<select name="status"><option value="">جميع الحالات</option>'+options.map(v=>'<option value="'+e(v)+'" '+(v===filter.status?'selected':'')+'>'+e(statusLabels[v]||v)+'</option>').join('')+'</select></label>':'')+'<button type="submit" class="adm-button">تطبيق الفلاتر</button><a class="adm-link" href="/admin/'+section+'">مسح</a></form>';
@@ -160,12 +160,58 @@ function home(data){
  return metrics+'<div class="adm-two">'+card('آخر طلبات التغيير',recent,'<a class="adm-link" href="/admin/requests">عرض الكل</a>')+card('آخر أحداث التدقيق',events,'<a class="adm-link" href="/admin/audit">عرض السجل</a>')+'</div>'+card('إجراءات سريعة','<div class="adm-chiprow"><a class="adm-button ghost" href="/admin/genealogy">إضافة الأفراد والأفخاذ والعوائل</a><a class="adm-button ghost" href="/admin/members">إدارة الأعضاء</a><a class="adm-button ghost" href="/admin/requests">مراجعة الطلبات</a><a class="adm-button ghost" href="/admin/roles">الأدوار والصلاحيات</a><a class="adm-button ghost" href="/admin/system">مراقبة النظام</a></div>');
 }
 function memberList(data,filter,csrf){
- const rows=data.rows.map(u=>{
-  const details=u.is_admin?'<span class="adm-badge good">حساب إداري محمي</span>':u.verified?status('active'):status('pending');
-  const actions=u.is_admin?'<span class="adm-muted">محمي من الإيقاف</span>':actionButton('members',csrf,'change_member',{id:u.id},'<label>الإجراء<select name="state"><option value="suspended">إيقاف العضوية</option><option value="active">تفعيل الحساب</option></select></label><label><input type="checkbox" name="confirm" value="yes" required> أؤكد تغيير الحالة</label>','يتطلب بريدًا مؤكّدًا. لا يثبت هذا الإجراء النسب تلقائيًا.');
-  return tr(['<strong>'+e(u.name||'غير محدد')+'</strong><div class="adm-muted" dir="ltr">'+e(u.email)+'</div>',details,status(u.account_status),rowTime(u.created_at),actions]);
+ const options=(items,selected)=>items.map(item=>'<option value="'+e(item.id)+'"'+(selected===item.id?' selected':'')+'>'+e(item.name_ar)+'</option>').join('');
+ const choice=(title,key,items,selected)=>'<label>'+title+'<select name="'+key+'"><option value="">الكل</option>'+options(items,selected)+'</select></label>';
+ const scopeSearch='<form method="get" action="/admin/members" class="adm-tools">'+
+  choice('١. الفخذ','fakhth',data.fakhths||[],filter.fakhth)+
+  (filter.fakhth?choice('٢. العائلة','family',data.families||[],filter.family):'')+
+  '<label>'+(filter.fakhth?'٣. اسم الفرد أو بريده':'اسم العضو أو بريده')+'<input type="search" name="q" value="'+e(filter.q)+'" maxlength="80"></label>'+
+  '<label>حالة العضوية<select name="status"><option value="">الكل</option>'+
+  ['active','pending','frozen','suspended','archived'].map(key=>'<option value="'+key+'"'+(key===filter.status?' selected':'')+'>'+statusLabels[key]+'</option>').join('')+
+  '</select></label><button class="adm-button" type="submit">بحث</button><a class="adm-link" href="/admin/members">مسح الفلاتر</a></form>';
+ const identitySearch=data.canIdentity?'<details class="adm-detail"'+(data.identityResult?' open':'')+'><summary>بحث برقم الهوية الوطنية</summary>'+
+  form('members',csrf,'lookup_member_identity',h('identifier_type','national_id')+
+   '<label>رقم الهوية<input type="password" name="identity" inputmode="numeric" maxlength="20" autocomplete="off" required></label>','مطابقة الهوية')+
+  (data.identityResult?'<p class="adm-note" role="status">'+(data.identityResult.matched?'تطابق مع '+e(data.identityResult.record.full_name_ar)+' · '+e(data.identityResult.record.masked_value):'لم يتم العثور على هوية مطابقة.')+'</p>':'')+'</details>':'';
+ const assignments=new Map();
+ for(const assignment of data.assignments||[]){
+  if(!assignments.has(assignment.user_id))assignments.set(assignment.user_id,[]);
+  assignments.get(assignment.user_id).push(assignment);
+ }
+ const cards=data.rows.map(u=>{
+  const allowed=u.id&&u.verified&&!u.banned&&!u.is_admin&&u.id!==data.actorId;
+  const confirmation='<label class="adm-chiprow"><span><input type="checkbox" name="confirm" value="yes" required> أؤكد الإجراء</span></label>';
+  const wrap=(name,body)=>'<details class="adm-detail"><summary>'+name+'</summary>'+body+'</details>';
+  const edit=allowed&&data.canManage?wrap('تعديل العضو',form('members',csrf,'edit_member',h('id',u.id)+
+   '<label>اسم العرض الإداري<input name="display_name" value="'+e(u.display_name||u.name||u.full_name_ar)+'" required minlength="3" maxlength="100"></label>')):'';
+  const lifecycle=allowed&&data.canManage?wrap('تفعيل أو تجميد أو إيقاف',form('members',csrf,'change_member',h('id',u.id)+
+   '<label>الحالة الجديدة<select name="state" required><option value="">اختر</option>'+
+   [['active','تفعيل'],['frozen','تجميد'],['suspended','إيقاف']].map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join('')+
+   '</select></label>'+confirmation,'تطبيق الحالة')):'';
+  const archive=allowed&&data.canManage&&u.account_status!=='archived'?wrap('إزالة العضوية',form('members',csrf,'change_member',h('id',u.id)+h('state','archived')+
+   '<p class="adm-note">تؤرشف العضوية ويُلغى تفويضها. يبقى سجل النسب وسجل التدقيق محفوظين.</p>'+confirmation,'أرشفة العضوية',true)):'';
+  const add=!u.id&&u.record_status==='verified'&&data.canLink?wrap('إضافة العضو بربط حساب مؤكّد',form('members',csrf,'add_member',h('person',u.person_id)+
+   '<label>بريد حساب العضو<input name="email" type="email" maxlength="254" required></label><label>دليل المطابقة وملاحظات المراجعة<textarea name="note" required minlength="10" maxlength="600"></textarea></label>','ربط العضوية وتفعيلها')):'';
+  const scope=allowed&&data.canAssign&&u.account_status==='active'&&u.record_status==='verified'&&u.fakhth_unit_id?wrap('تعيين الإشراف والصلاحيات',form('members',csrf,'grant_member_scope',h('id',u.id)+
+   '<label>نوع الإشراف<select name="scope" required><option value="">اختر</option><option value="family">مشرف العائلة</option><option value="fakhth">مشرف الفخذ</option><option value="parent">مشرف ذريته</option><option value="family_leader">قائد العائلة</option><option value="fakhth_leader">قائد الفخذ</option></select></label>'+
+   '<label>مدة التفويض<select name="duration_days"><option value="30">٣٠ يومًا</option><option value="90" selected>٩٠ يومًا</option><option value="365">سنة</option></select></label>'+
+   '<p class="adm-note">يحدد النظام النطاق من العائلة والفخذ المرتبطين بسجل العضو.</p>','منح الصلاحية')):'';
+  const custom=scope&&data.customRoles?.length?wrap('منح دور مخصص على مستوى القبيلة',form('members',csrf,'grant_member_scope',
+   h('id',u.id)+h('scope','custom')+'<label>الدور<select name="custom_role" required><option value="">اختر</option>'+
+   options(data.customRoles)+'</select></label><label>المدة<select name="duration_days"><option value="30">٣٠ يومًا</option><option value="90">٩٠ يومًا</option><option value="365">سنة</option></select></label>','منح الدور')):'';
+  const granted=allowed&&data.canAssign&&assignments.has(u.id)?wrap('التفويضات السارية',assignments.get(u.id).map(a=>
+   '<p>'+e(a.name_ar)+(a.scope_name?' · '+e(a.scope_name):'')+'</p>'+
+   form('members',csrf,'revoke_member_scope',h('member',u.id)+h('id',a.id)+confirmation,'إلغاء التفويض',true)).join('')):'';
+  const lineage=[u.fakhth_name,u.family_name,u.full_name_ar].filter(Boolean).map(e).join(' ← ');
+  return '<article class="adm-card"><div class="adm-topline"><h2>'+e(u.display_name||u.name||u.full_name_ar||'عضو')+'</h2>'+
+   (u.is_admin?'<span class="adm-badge good">حساب إداري محمي</span>':u.id?status(u.account_status):'<span class="adm-badge">فرد بلا حساب مرتبط</span>')+'</div>'+
+   (u.email?'<p class="adm-muted"><bdi>'+e(u.email)+'</bdi> · '+(u.verified?'بريد مؤكّد':'بريد غير مؤكّد')+'</p>':'')+
+   (lineage?'<p>'+lineage+'</p>':'')+edit+lifecycle+scope+custom+granted+add+archive+'</article>';
  });
- return card('دليل حسابات الأعضاء',filters('members',filter)+table(['العضو','البريد','حالة الحساب','تاريخ الإنشاء','الإدارة'],rows)+pager('members',filter,data));
+ return card('سجل الأعضاء والصلاحيات',scopeSearch+identitySearch+
+  '<div class="adm-chiprow"><a class="adm-link" href="/admin/genealogy#gen-tree-create">إضافة سجل فرد</a>'+
+  '<a class="adm-link" href="/admin/supervisors">دعوات الإشراف</a><a class="adm-link" href="/admin/roles">إدارة الأدوار المخصصة</a></div>')+
+  (cards.join('')||empty('لا توجد نتائج','جرّب اسمًا آخر أو اختر فخذًا وعائلة.'))+pager('members',filter,data);
 }
 function requestList(data,filter,csrf){
  const rows=data.rows.map(r=>{
@@ -274,7 +320,7 @@ function kinshipView(data) {
 export function adminView(section,user,data,filter,csrf,done=false){
  const title=names[section]||'الإدارة';
  const sidebar='<aside class="adm-side"><div class="adm-side-title">مركز إدارة الديوان</div><nav class="adm-nav" aria-label="أقسام الإدارة">'+navOrder.map(k=>'<a href="/admin/'+k+'" '+(k===section?'aria-current="page"':'')+'>'+icon(k,20)+e(names[k])+'</a>').join('')+'</nav></aside>';
- const description=section==='genealogy'?'ابحث في سجل الأفراد، وراجع صلات القرابة، وأدر سجلات العائلات والأفخاذ.':section==='overview'?'مؤشرات مباشرة وإجراءات منظمة لإدارة عضوية الديوان ومحتواه وصلاحياته.': 'جميع العمليات الحساسة محمية بمراجعة الصلاحية وسجل تدقيق.';
+ const description=section==='members'?'ابحث عن الفرد أو حسابه، وأدر حالة العضوية والتفويضات حسب العائلة والفخذ.':section==='genealogy'?'ابحث في سجل الأفراد، وراجع صلات القرابة، وأدر سجلات العائلات والأفخاذ.':section==='overview'?'مؤشرات مباشرة وإجراءات منظمة لإدارة عضوية الديوان ومحتواه وصلاحياته.': 'جميع العمليات الحساسة محمية بمراجعة الصلاحية وسجل تدقيق.';
  const hero='<div class="adm-crumbs"><a href="/dashboard">لوحة التحكم</a><span> / </span><a href="/admin">الإدارة</a><span> / </span><strong>'+e(title)+'</strong></div><header class="adm-hero"><span class="adm-eyebrow">ديوان الحازمي · الإدارة</span><h1>'+icon(section,27)+' '+e(title)+'</h1><p>'+e(description)+'</p></header>';
  let content='';
  if(section==='overview')content=home(data);

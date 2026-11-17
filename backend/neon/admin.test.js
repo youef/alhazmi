@@ -36,7 +36,7 @@ test('administration requires an approved system scope',async()=>{
 test('administrative view escapes untrusted member data',()=>{
   const suspicious='Member<img src=x onerror=alert(1)>';
   const html=adminView('members',{name:'Admin'},{
-    rows:[{id:'11111111-1111-4111-8111-111111111111',name:suspicious,email:'bad<script>execute()</script>@test.com',
+    canManage:true,rows:[{id:'11111111-1111-4111-8111-111111111111',name:suspicious,email:'bad<script>execute()</script>@test.com',
       verified:true,account_status:'active',is_admin:false,created_at:'2026-11-15T00:00:00.000Z'}],total:1,page:1,limit:18
   },{page:1,status:'',q:''},'f'.repeat(64));
   assert.match(html,/&lt;img src=x onerror=alert\(1\)&gt;/);
@@ -123,4 +123,44 @@ test('kinship data can only be read by the system admin',async()=>{
  const result=await adminData(member,'kinship',new URL(base+'/admin/kinship'));
  assert.equal(result.data.viewerId,'self');
  assert.deepEqual(result.data.people,[]);
+});
+
+test('member grants derive the family leader scope from the verified profile',async()=>{
+  const id='22222222-2222-4222-8222-222222222222';
+  const family='33333333-3333-4333-8333-333333333333';
+  const role='44444444-4444-4444-8444-444444444444';
+  const stages=[];
+  pool.connect=async()=>({query:async(sql,args)=>{
+    stages.push(sql);
+    if(sql.startsWith('select id from neon_auth'))return {rows:[{id}]};
+    if(sql.includes('for update of p'))return {rows:[{person_id:id,family_unit_id:family,fakhth_unit_id:role}]};
+    if(sql.includes("where role_key=$1")){
+      assert.deepEqual(args,['diwan_family_leader']);
+      return {rows:[{id:role}]};
+    }
+    if(sql.startsWith('insert into public.user_custom_role_assignments')){
+      assert.deepEqual(args,[id,role,'family',family,null,member.id,90]);
+    }
+    return {rows:[]};
+  },release(){}});
+  const form=new URLSearchParams({operation:'grant_member_scope',csrf:csrfFor(member,req()),id,scope:'family_leader',duration_days:'90',family:id});
+  await adminAction(member,'members',req('/admin/members'),form);
+  assert.ok(stages.some(sql=>sql.startsWith('insert into public.user_custom_role_assignments')));
+  assert.equal(stages.at(-1),'commit');
+});
+
+test('archiving a member revokes non-system assignments in the same transaction',async()=>{
+  const id='22222222-2222-4222-8222-222222222222';
+  const stages=[];
+  pool.connect=async()=>({query:async(sql,args)=>{
+    stages.push(sql);
+    if(sql.startsWith('select id from neon_auth'))return {rows:[{id}]};
+    if(sql.startsWith('insert into public.user_profiles'))assert.deepEqual(args,[id,'archived']);
+    if(sql.startsWith('update public.user_custom_role_assignments'))assert.match(sql,/not r\.is_system/);
+    return {rows:[]};
+  },release(){}});
+  const form=new URLSearchParams({operation:'change_member',csrf:csrfFor(member,req()),id,state:'archived',confirm:'yes'});
+  await adminAction(member,'members',req('/admin/members'),form);
+  assert.ok(stages.some(sql=>sql.startsWith('update public.user_custom_role_assignments')));
+  assert.equal(stages.at(-1),'commit');
 });

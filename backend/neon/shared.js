@@ -29,7 +29,7 @@ export async function accountFromId(id){
    [id]);
  if(!result.rows.length)throw new HttpError(401,'Account not found');
  const u=result.rows[0];
- if(u.account_status==='suspended')throw new HttpError(403,'Account suspended');
+ if(['suspended','frozen','archived'].includes(u.account_status))throw new HttpError(403,'Account suspended');
  return u;
 }
 export const digest=buffer=>createHash('sha256').update(buffer).digest('hex');
