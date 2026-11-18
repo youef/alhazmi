@@ -23,7 +23,8 @@ export function canonicalName(raw) {
 }
 export function fingerprintIdentity(number, kind, secret) {
   if (!secret || typeof secret !== 'string') throw new Error('IDENTITY_KEY_MISSING');
-  const normalized = String(number || '').trim().replace(/[\s-]/gu, '').toUpperCase();
+  const normalized = String(number || '').trim().replace(/[٠-٩۰-۹]/g,digit=>String(digit.charCodeAt(0)-(digit<='٩'?0x660:0x6f0)))
+    .replace(/[\s-]/gu, '').toUpperCase();
   if (!['national_id', 'residency', 'passport', 'birth_certificate'].includes(kind)) throw new Error('IDENTITY_KIND');
   if (kind === 'national_id' || kind === 'residency') {
     if (!/^[12][0-9]{9}$/.test(normalized)) throw new Error('IDENTITY_FORMAT');

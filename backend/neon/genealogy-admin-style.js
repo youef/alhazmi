@@ -174,4 +174,15 @@ export const genealogyStyles=`
  .gen-shell .gen-services{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
  .gen-shell .gen-services a{padding-inline:5px;font-size:.87rem}
 }
+
+.gen-family-select{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
+.gen-lookup{display:grid;gap:8px;padding:13px;background:#f5faf7;border:1px solid var(--gen-border);border-radius:12px}
+.gen-lookup-fields{display:grid;grid-template-columns:minmax(110px,1fr) minmax(140px,1.4fr) auto;gap:8px;align-items:end}
+.gen-lookup-fields button{font:inherit;cursor:pointer}
+.gen-lookup-fields button:disabled{opacity:.6;cursor:wait}
+.gen-lookup [data-lookup-result]:empty{display:none}
+.gen-relation-fold{scroll-margin-top:20px}
+@media(max-width:680px){
+ .gen-family-select,.gen-lookup-fields{grid-template-columns:1fr}
+}
 `;

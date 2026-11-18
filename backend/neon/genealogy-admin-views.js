@@ -17,31 +17,47 @@ const form=(operation,csrf,body,label)=>
  '<form method="post" action="/admin/genealogy" class="gen-form">'+h('csrf',csrf)+h('operation',operation)+body+
  '<button class="gen-submit" type="submit">'+e(label)+'</button></form>';
 
-function selectParents(data, role, selected=''){
- const opts=options(data.directory,'id',p=>p.full_name_ar+' — '+(gender[p.gender]||'')+' · '+(p.identity_mask||'بلا هوية'),selected);
- return '<select name="'+e(role)+'_id" aria-label="اختيار '+e(role)+'" >'+(selected?opts.replace('<option value="">','<option value="" disabled>'):opts)+'</select>';
+function lookupFields(prefix,idName,title,person){
+ const id=person?.id||'';
+ return '<div class="gen-lookup gen-wide" data-relative-lookup data-initial-id="'+e(id)+'">'+
+  '<strong>'+e(title)+'</strong>'+h(idName,id)+
+  '<div class="gen-lookup-fields"><label>نوع الوثيقة'+idKind(prefix+'_identity_kind')+'</label>'+
+  '<label>رقم الهوية أو الوثيقة<input type="password" inputmode="numeric" autocomplete="off" name="'+e(prefix)+'_identity" maxlength="50"></label>'+
+  '<button class="gen-compact-button" type="button" data-lookup-submit>بحث بالهوية</button></div>'+
+  '<p class="gen-muted" data-lookup-result aria-live="polite">'+(id?'السجل المرتبط: '+e(person.full_name_ar):'')+'</p></div>';
 }
 function relative(data,role,label,genderAr){
- const auto=data.childOf && ((role==='father'&&data.childOf.gender==='male')||(role==='mother'&&data.childOf.gender==='female'))?data.childOf.id:'';
- const chooser=selectParents(data,role,auto);
- return '<details class="gen-details"'+(auto?' open':'')+'><summary>'+e(label)+' · '+e(genderAr)+' — اختر موجودًا أو أضف جديدًا</summary>'+
- '<div class="gen-relative"><label class="gen-wide">شخص موجود مسجل'+chooser+'</label>'+
- '<label class="gen-wide">الاسم الكامل عند إنشاء سجل جديد<input name="'+e(role)+'_name" maxlength="200" placeholder="اكتب الاسم الكامل كما في المستند" autocomplete="off"></label>'+
- '<label>نوع الوثيقة'+idKind(role+'_identity_kind')+'</label>'+
- '<label>رقم الهوية أو الوثيقة<input type="password" inputmode="numeric" autocomplete="off" name="'+e(role)+'_identity" maxlength="50" placeholder="اختياري ولا يُعرض بعد الحفظ"></label></div>'+
- '<small>إذا أدخلت هوية موجودة، يستلزم استخدامها موافقتك على إعادة ربط السجل المطابق، ولا يتم إنشاء نسخة أخرى.</small></details>';
+ const auto=data.childOf&&((role==='father'&&data.childOf.gender==='male')||(role==='mother'&&data.childOf.gender==='female'))?data.childOf:null;
+ return '<details class="gen-details"'+(auto?' open':'')+'><summary>'+e(label)+' · '+e(genderAr)+'</summary>'+
+ '<div class="gen-form-grid">'+lookupFields(role,role+'_id','مطابقة شخص مسجّل',auto)+
+ '<label class="gen-wide">الاسم الكامل عند عدم العثور على سجل<input name="'+e(role)+'_name" maxlength="200" autocomplete="off"></label>'+
+ familySelect(data,'',role+'_family_id')+'</div></details>';
 }
 function unitSelect(data,selected='',blank='— دون أصل / فرع مستقل —',units=null){
  return '<select name="parent_id">'+options(units||data.directoryUnits||data.units,'id',u=>u.name_ar+' · '+(types[u.unit_type]||u.unit_type),selected,blank)+'</select>';
 }
 function familySelect(data,selected='',name='person_family_id'){
- const all=data.directoryUnits||data.units, byId=new Map(all.map(item=>[item.id,item]));
- const fakhth=unit=>{
-  let current=unit,depth=0;
-  while(current&&depth++<12){if(current.unit_type==='subclan')return current.name_ar;current=byId.get(current.parent_id);}
+ const all=data.directoryUnits||data.units;
+ const byId=new Map(all.map(item=>[item.id,item]));
+ const ancestry=unit=>{
+  const seen=new Set();
+  for(let item=unit;item&&!seen.has(item.id);item=byId.get(item.parent_id)){
+   if(item.fakhth_unit_id)return item.fakhth_unit_id;
+   if(item.registered_fakhth||item.unit_type==='subclan')return item.id;
+   seen.add(item.id);
+  }
   return '';
  };
- return '<select name="'+e(name)+'">'+options(all.filter(u=>['family','house'].includes(u.unit_type)),'id',u=>u.name_ar+(fakhth(u)?' · فخذ '+fakhth(u):''),selected,'— غير محدد —')+'</select>';
+ const families=all.filter(unit=>['family','house'].includes(unit.unit_type));
+ const selectedFakhth=ancestry(byId.get(selected));
+ const fakhths=all.filter(item=>item.registered_fakhth||item.unit_type==='subclan');
+ return '<div class="gen-family-select gen-full" data-family-picker>'+
+  '<label>الفخذ<select data-fakhth><option value="">اختر الفخذ</option>'+
+  fakhths.map(unit=>'<option value="'+e(unit.id)+'" data-tribe="'+e(unit.tribe_id)+'"'+(unit.id===selectedFakhth?' selected':'')+'>'+e(unit.name_ar)+'</option>').join('')+
+  '</select></label><label data-family-label>العائلة / البيت<select name="'+e(name)+'" data-family>'+
+  '<option value="">— غير محدد —</option>'+
+  families.map(unit=>'<option value="'+e(unit.id)+'" data-fakhth="'+e(ancestry(unit))+'" data-tribe="'+e(unit.tribe_id)+'"'+(unit.id===selected?' selected':'')+'>'+e(unit.name_ar)+'</option>').join('')+
+  '</select></label></div>';
 }
 function tribeSelect(data,name='tribe_id',selected=''){
  const value=selected||data.tribes[0]?.id||'';
@@ -77,7 +93,7 @@ function personWizard(data,csrf){
  '<div class="gen-form-grid"><label>الاسم الكامل *<input name="person_name" maxlength="200" minlength="3" required placeholder="الاسم الأول واسم الأب والجد"></label>'+
  '<label>الجنس<select name="person_gender"><option value="male">ذكر</option><option value="female">أنثى</option><option value="unknown">غير معروف</option></select></label>'+
  '<label>القبيلة / السجل'+tribeSelect(data)+'</label>'+
- '<label>العائلة / البيت'+familySelect(data)+'</label>'+
+ familySelect(data)+
  '<label>نوع الوثيقة'+idKind('person_identity_kind')+'</label>'+
  '<label>هوية الشخص (اختياري)<input type="password" inputmode="numeric" name="person_identity" autocomplete="off" maxlength="50" placeholder="لا تُعرض أو تحفظ بصيغتها الخام"></label>'+dateInput('person_birth_date','تاريخ الميلاد','','')+'<label>مكان الميلاد (اختياري)<input name="person_birth_place" maxlength="120"></label></div></fieldset>'+
  '<details class="gen-details"'+(data.childOf?' open':'')+'><summary>الأب والأم</summary><div class="gen-step-notice">اختر شخصًا موجودًا من القائمة أو افتح البطاقة لإضافة الأب والأم بالاسم والهوية. يمكن إضافة الابن حتى لو لم تتوفر سجلات الأجداد كاملة.</div>'+
@@ -170,23 +186,24 @@ function relationEditor(data,csrf){
  '<p class="gen-muted">لا يوجد أبناء مسجلون تحت هذا الشخص.</p>';
  const roles=Object.entries(relationRoles).map(([key,label])=>'<option value="'+key+'">'+e(label)+'</option>').join('');
  const genderOpts='<option value="unknown">غير محدد</option><option value="male">ذكر</option><option value="female">أنثى</option>';
+ const linkedParents=relations.spouses.filter(member=>['current','reported'].includes(member.marriage_status))
+  .map(member=>'<button type="button" class="gen-compact-button" data-co-parent-known="'+e(member.id)+'">'+e(member.full_name_ar)+'</button>').join('');
  const add=form('add_relation',csrf,
   h('person_id',p.id)+
   '<div class="gen-form-grid">'+
   '<label>صلة القرابة المطلوب إضافتها *<select name="relation_role" required>'+roles+'</select></label>'+
-  '<label>شخص موجود في سجلات الديوان'+
-   '<select name="relative_id" aria-label="اختيار قريب موجود">'+options(data.directory,'id',r=>r.full_name_ar+' · '+(r.identity_mask||'بلا هوية'),'','— ابحث بالاسم في القائمة أو أدخل الهوية —')+'</select></label>'+
-  wide('<p class="gen-muted">إن كانت الهوية مسجلة، يجري فحص بصمتها تلقائيًا عند الحفظ، وتُستخدم بيانات السجل الموجود بدل إنشاء مكرر بعد تأكيدك. وإذا كانت غير موجودة، يُنشأ ملف خاص للقريب مع علاقة تحت المراجعة.</p>')+
-  input('relative_name','الاسم الكامل للقريب (عند عدم اختيار سجل سابق)','',200,'text','autocomplete="off"')+
+  lookupFields('relative','relative_id','شخص موجود في سجلات الديوان')+
+  input('relative_name','الاسم الكامل عند إنشاء سجل جديد','',200,'text','autocomplete="off"')+
   '<label>جنس القريب الجديد<select name="relative_gender">'+genderOpts+'</select></label>'+
-  '<label>نوع الهوية'+idKind('relative_identity_kind')+'</label>'+
-  input('relative_identity','رقم الهوية أو الوثيقة','',50,'password','inputmode="numeric" autocomplete="off" placeholder="يستخدم للمطابقة أولًا"')+
-  '<label>العائلة / البيت للقريب'+familySelect(data,'','relative_family_id')+'</label>'+
-  '<label>الزوج/الزوجة الآخر كوالد للابن (اختياري)<select name="co_parent_id">'+options(relations.spouses.filter(x=>['current','reported'].includes(x.marriage_status)),'id',x=>x.full_name_ar+' — '+(marriageLabels[x.marriage_status]||''),'','— بلا والد ثانٍ —')+'</select></label>'+
+  familySelect(data,'','relative_family_id')+
+  '<div class="gen-full" data-coparent>'+lookupFields('co_parent','co_parent_id','الأب أو الأم الآخر للابن أو الابنة')+
+  (linkedParents?'<div class="gen-action-group"><span class="gen-muted">أو اختر من الأزواج المرتبطين:</span>'+linkedParents+'</div>':
+   '<p class="gen-muted">سجّل علاقة الزواج أولًا ليصبح الطرف الآخر متاحًا عند إضافة الأبناء.</p>')+'</div>'+
+  '<label data-marriage-date>تاريخ الزواج (اختياري)<input type="date" name="marriage_start_date"></label>'+
   '<label>تاريخ الميلاد<input type="date" name="relative_birth_date"></label>'+
   input('relative_birth_place','مكان الميلاد','',120)+
   '<label>حالة الحياة<select name="relative_living_status"><option value="unknown">غير معروف</option><option value="alive">حي</option><option value="deceased">متوفى</option></select></label>'+
-  wide('<label class="gen-check"><input type="checkbox" name="confirm_reuse" value="yes">أوافق على ربط سجل مسجل مسبقًا عند تطابق رقم هويته واسمه</label>')+
+  h('confirm_reuse','yes')+
   '</div>'+
   '<details class="gen-details"><summary>تفاصيل إضافية للقريب الجديد · اختياري</summary><div class="gen-form-grid">'+
    input('relative_phone','الجوال','',32,'tel')+
@@ -208,7 +225,7 @@ function relationEditor(data,csrf){
    wide('<label>ملاحظات خاصة<textarea name="relative_private_notes" maxlength="5000" rows="4"></textarea></label>')+
    '</div></details>'+
    '<p class="gen-muted">للأب والأجداد الذكور من جهة النسب الأبوي، يمكن اقتراح العائلة المسجلة تلقائيًا عند عدم اختيار عائلة أخرى. الأم والزوجة وعائلاتهن لا تُستنتج من اسم الزوج.</p>',
-   'فحص الهوية وحفظ صلة القرابة');
+   'حفظ صلة القرابة');
  const currentMarriage=isMarried?'<div class="gen-rel-tabs"><h3>الزوجات / الأزواج المسجلون</h3>'+spouses+'<h3>الأبناء والبنات</h3>'+children+'</div>':
  '<div class="gen-rel-tabs"><h3>الأب والأم والأجداد</h3>'+ancestors+'</div>';
  const secondary=isMarried?'<details class="gen-details gen-rel-ancestors"><summary>عرض الأب والأم وأجداد الطرفين</summary>'+ancestors+'</details>':
@@ -245,9 +262,9 @@ function editPersonCard(data,csrf){
   input('given_name','الاسم الأول',p.given_name_ar,100)+input('middle_name','اسم الأب والأجداد',p.middle_name_ar,150)+
   input('surname','اسم العائلة أو اللقب',p.surname_ar,100)+
   '<label>الجنس'+genderSelect(p.gender)+'</label>'+
-  '<label>العائلة / البيت'+familySelect(data,p.family_unit_id,'family_id')+'</label>'+
-  '<label>الأب'+selectParents(data,'father',p.father_id)+'</label>'+
-  '<label>الأم'+selectParents(data,'mother',p.mother_id)+'</label>'+
+  familySelect(data,p.family_unit_id,'family_id')+
+  h('father_id',p.father_id)+h('mother_id',p.mother_id)+
+  wide('<p><a href="#gen-family-relations" data-open-relations>إدارة الأب والأم وبقية الأقارب عبر الهوية</a></p>')+
   '</div><p class="gen-muted">يمكن إضافة أب أو أم غير مسجلين. تغيير الوالدين المرتبطين مسبقًا يتم عبر طلب تصحيح موثق لحماية تسلسل الأنساب.</p>',true)+
   section('الميلاد والوفاة والنبذة','<div class="gen-form-grid">'+
   input('birth_place','مكان الميلاد',p.birth_place,120)+
@@ -291,8 +308,8 @@ function editPersonCard(data,csrf){
  return '<section class="gen-section gen-editor" id="gen-person-edit">'+
   '<div class="gen-section-head"><div><h2>تعديل سجل: '+e(p.full_name_ar)+'</h2>'+
   '<small>افتح المجموعة المطلوبة ثم احفظ التعديلات.</small></div>'+
-  '<a href="/admin/genealogy" class="gen-compact-button">إغلاق المحرر</a></div>'+
-  '<div class="gen-editor-layout"><div class="gen-editor-main">'+edit+birthDocuments+'<details class="gen-details gen-relation-fold"><summary>القرابة والأصول والأبناء</summary>'+relationEditor(data,csrf)+'</details>'+'</div>'+
+  '<a href="/admin/genealogy" class="gen-compact-button">رجوع للسجل</a><a href="#gen-family-relations" data-open-relations class="gen-compact-button">إدارة القرابة</a></div>'+
+  '<div class="gen-editor-layout"><div class="gen-editor-main">'+edit+birthDocuments+'<details class="gen-details gen-relation-fold" id="gen-family-relations"><summary>القرابة والأصول والأبناء</summary>'+relationEditor(data,csrf)+'</details>'+'</div>'+
   '<aside class="gen-editor-side"><div class="gen-side-panel"><h3>حالة السجل</h3><span class="gen-pill">'+e(status[p.record_status]||p.record_status)+'</span>'+
   '<p class="gen-muted">ترتبط بيانات الأنساب بمراجعة موثقة. لا يؤدي تغيير البيانات الخاصة إلى نشرها للعامة.</p></div>'+
   '<details class="gen-details"><summary>أرشفة / استعادة السجل</summary>'+archive+'</details>'+

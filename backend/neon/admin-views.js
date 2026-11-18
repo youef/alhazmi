@@ -1,3 +1,4 @@
+import { familyAdminContent } from './family-views.js';
 
 import { escapeHtml as esc, page } from './member-views.js';
 import { genealogyView } from './genealogy-admin-views.js';
@@ -18,7 +19,11 @@ const ICONS={
 };
 const icon=(name,size=22)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[name]||ICONS.overview)+'</svg>';
 const names={overview:'نظرة عامة',genealogy:'إدارة الأنساب والأفراد',members:'الأعضاء',kinship:'شجرة عائلتي',requests:'طلبات التغيير',services:'الخدمات',claims:'ربط السجلات',roles:'الأدوار والصلاحيات',supervisors:'مشرفو الأفخاذ والعائلات',audit:'سجل التدقيق',system:'حالة النظام'};
-const navOrder=['overview','genealogy','kinship','members','requests','services','claims','roles','supervisors','audit','system'];
+const navGroups=[
+ ['السجل العائلي',['overview','genealogy','kinship']],
+ ['العضوية والمعاملات',['members','services','claims','requests']],
+ ['الحوكمة',['roles','supervisors','audit','system']],
+];
 const css=`
 .adm-root{--a:#076a45;--b:#075138;--sub:#6a7c72;--bd:#deebe3;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px;align-items:start}
 .adm-side{background:#fff;border:1px solid var(--bd);border-radius:20px;position:sticky;top:108px;padding:14px;box-shadow:0 14px 34px #06452a0a}
@@ -127,6 +132,30 @@ const css=`
 @media(max-width:500px){.adm-card{padding:14px}.adm-tools{padding:11px}.adm-metric{min-height:110px}.adm-table{font-size:.78rem}.adm-table th,.adm-table td{padding:10px 8px}}
 @media(prefers-reduced-motion:reduce){.adm-metric{transition:none}.adm-metric:hover{transform:none}}
 
+
+.adm-root{grid-template-columns:218px minmax(0,1fr);gap:20px}
+.adm-side{border-radius:16px;padding:12px}
+.adm-side-title{margin-bottom:10px;padding-block:8px 12px}
+.adm-nav-group{display:grid;gap:3px;margin-bottom:9px;min-width:0}
+.adm-nav-group>span{font-size:.72rem;color:#536f60;padding:2px 12px;font-weight:750}
+.adm-nav a{min-height:41px;padding-block:7px!important}
+.adm-hero,.adm-genealogy .adm-hero{display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:16px;
+ min-height:0;padding:clamp(18px,3.5vw,31px);border-radius:16px;background:#073e2b;border:1px solid #0e6547}
+.adm-hero h1{font-size:clamp(1.35rem,3vw,1.95rem);line-height:1.35}
+.adm-hero p{margin-top:4px}
+.adm-page-icon{display:grid;place-items:center;width:50px;height:50px;flex:0 0 50px;border-radius:12px;background:#ffffff1c;color:#e4f4ea}
+.adm-card,.adm-metric{border-radius:14px}
+.adm-card .adm-topline{border-bottom:1px solid var(--bd);padding-bottom:10px}
+.adm-table tbody tr{background:#fff}
+.adm-root .family-index{display:flex;gap:8px;justify-content:flex-start;margin:0;padding:0}
+.adm-root .family-index a{background:#e6f4eb;color:#075138;padding:7px 12px;border-radius:8px}
+.adm-root .family-shell{--surface:#fff;--text:#17372a}
+.adm-root .family-shell .family-card{scroll-margin-top:16px}
+@media(max-width:900px){
+ .adm-root{grid-template-columns:minmax(0,1fr)}
+ .adm-nav-group{display:flex;gap:3px;margin:0}
+ .adm-nav-group>span{display:none}
+}
 `;
 const statusLabels={active:'نشط',pending:'بانتظار التفعيل',suspended:'موقوف',frozen:'مجمّد',archived:'مؤرشف',submitted:'مقدّم',triage:'فرز',needs_evidence:'يتطلب مستندات',approved:'معتمد',rejected:'مرفوض',draft:'مسودة',retired:'مؤرشف',review:'قيد المراجعة',in_review:'قيد المراجعة',completed:'مكتمل',cancelled:'ملغى'};
 const status=v=>{
@@ -321,9 +350,26 @@ function kinshipView(data) {
 
 export function adminView(section,user,data,filter,csrf,done=false){
  const title=names[section]||'الإدارة';
- const sidebar='<aside class="adm-side"><div class="adm-side-title">مركز إدارة الديوان</div><nav class="adm-nav" aria-label="أقسام الإدارة">'+navOrder.map(k=>'<a href="/admin/'+k+'" '+(k===section?'aria-current="page"':'')+'>'+icon(k,20)+e(names[k])+'</a>').join('')+'</nav></aside>';
- const description=section==='members'?'ابحث عن الفرد أو حسابه، وأدر حالة العضوية والتفويضات حسب العائلة والفخذ.':section==='genealogy'?'ابحث في سجل الأفراد، وراجع صلات القرابة، وأدر سجلات العائلات والأفخاذ.':section==='overview'?'مؤشرات مباشرة وإجراءات منظمة لإدارة عضوية الديوان ومحتواه وصلاحياته.': 'جميع العمليات الحساسة محمية بمراجعة الصلاحية وسجل تدقيق.';
- const hero='<div class="adm-crumbs"><a href="/dashboard">لوحة التحكم</a><span> / </span><a href="/admin">الإدارة</a><span> / </span><strong>'+e(title)+'</strong></div><header class="adm-hero"><span class="adm-eyebrow">ديوان الحازمي · الإدارة</span><h1>'+icon(section,27)+' '+e(title)+'</h1><p>'+e(description)+'</p></header>';
+ const sidebar='<aside class="adm-side"><div class="adm-side-title">إدارة الديوان</div>'+
+  '<nav class="adm-nav" aria-label="أقسام الإدارة">'+navGroups.map(([label,sections])=>
+   '<div class="adm-nav-group"><span>'+label+'</span>'+sections.map(k=>'<a href="/admin/'+k+'"'+
+    (k===section?' aria-current="page"':'')+'>'+icon(k,20)+e(names[k])+'</a>').join('')+'</div>').join('')+'</nav></aside>';
+
+ const descriptions={
+  overview:'حالة العضويات والسجلات والطلبات ومسارات العمل.',
+  genealogy:'إدارة الأفراد والأصول والقرابة ومصادر التوثيق.',
+  kinship:'الوالدان والأجداد والأبناء والقرابة المرتبطة بحسابك.',
+  members:'البحث عن الأفراد وإدارة العضوية والتفويضات.',
+  services:'إدارة الخدمات ومراجعة المعاملات المقدّمة.',
+  claims:'مطابقة حسابات الأعضاء مع سجلات الأفراد الموثّقة.',
+  requests:'مراجعة طلبات التغيير والأدلة واتخاذ القرار.',
+  roles:'إدارة الأدوار المخصصة ومنح الصلاحيات ومراجعتها.',
+  supervisors:'تعيين مشرفي الأفخاذ والعائلات ومراجعة طلبات القرابة.',
+  audit:'تتبّع الإجراءات والقرارات الإدارية.',system:'مراقبة بيانات التشغيل الأساسية.',
+ };
+ const hero='<div class="adm-crumbs"><a href="/dashboard">خدماتي</a><span aria-hidden="true"> / </span><a href="/admin">الإدارة</a></div>'+
+  '<header class="adm-hero"><span class="adm-page-icon" aria-hidden="true">'+icon(section,25)+'</span><div><h1>'+e(title)+'</h1>'+
+  '<p>'+e(descriptions[section]||'')+'</p></div></header>';
  let content='';
  if(section==='overview')content=home(data);
  else if(section==='genealogy')content=genealogyView(data,csrf);
@@ -332,6 +378,7 @@ export function adminView(section,user,data,filter,csrf,done=false){
  else if(section==='requests')content=requestList(data,filter,csrf);
  else if(section==='services')content=serviceList(data,filter,csrf);
  else if(section==='claims')content=claimsList(data,filter,csrf);
+ else if(section==='supervisors')content=familyAdminContent(data,csrf);
  else if(section==='roles')content=roleList(data,csrf);
  else if(section==='audit')content=auditList(data,filter);
  else if(section==='system')content=systemView(data);

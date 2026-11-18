@@ -181,3 +181,33 @@ test('editing genealogy preserves partial dates and accepts Arabic digits',async
  assert.equal(values[10],'2020-01-01');
  assert.deepEqual(values.slice(11,13),['month','year']);
 });
+
+test('a new child is linked to both matched parents in one transaction',async()=>{
+ const father='22222222-2222-4222-8222-222222222222';
+ const mother='33333333-3333-4333-8333-333333333333';
+ const child='44444444-4444-4444-8444-444444444444';
+ const tribe='55555555-5555-4555-8555-555555555555';
+ const writes=[];
+ const data={
+  [father]:{id:father,gender:'male',tribe_id:tribe},
+  [mother]:{id:mother,gender:'female',tribe_id:tribe},
+  [child]:{id:child,gender:'female',tribe_id:tribe},
+ };
+ pool.connect=async()=>({query:async(sql,args)=>{
+  if(sql.startsWith('select id,tribe_id')&&sql.includes('from public.people'))return {rowCount:1,rows:[data[args[0]]]};
+  if(sql.startsWith('insert into public.people'))return {rowCount:1,rows:[{id:child}]};
+  if(sql.startsWith("select 1 from public.person_identifiers where person_id")||sql.startsWith('select 1 from public.marriages'))
+    return {rowCount:1,rows:[{}]};
+  if(sql.startsWith('update public.people set'))writes.push([sql,args]);
+  if(sql==='commit'||sql==='rollback')writes.push([sql]);
+  return {rowCount:0,rows:[]};
+ },release(){}});
+ const form=new URLSearchParams({operation:'add_relation',csrf:csrfFor(member,req()),person_id:father,relation_role:'child',
+  relative_name:'ابنة تجريبية',relative_gender:'female',co_parent_id:mother,co_parent_identity:'١٠١٢٣٤٥٦٧٨'});
+ const location=await adminAction(member,'genealogy',req('/admin/genealogy'),form);
+ assert.match(location,/#gen-family-relations$/);
+ assert.match(writes[0][0],/set father_id=/);
+ assert.match(writes[1][0],/set mother_id=/);
+ assert.deepEqual(writes.slice(0,2).map(([,parameters])=>parameters),[[child,father],[child,mother]]);
+ assert.equal(writes.at(-1)[0],'commit');
+});

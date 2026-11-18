@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { afterEach,beforeEach,test } from 'node:test';
 import { familyAction, familySupervisorData } from './family-management.js';
-import { familyAdminView,familyMemberView } from './family-views.js';
+import { familyAdminContent,familyMemberView } from './family-views.js';
 import { csrfFor } from './admin.js';
 import { pool } from './shared.js';
 
@@ -97,7 +97,7 @@ test('family rendering escapes names and exposes no sensitive identifier',()=>{
  const html=familyMemberView({invites:[],families:[],grants:[],pending:[{id:requestId,proposed_name_ar:fake,relationship:'self',family_name:'اختبار',status:'submitted'}],relatives:[],anchors:[],consents:[],ownVerified:false,personId:null},'a'.repeat(64),false);
  assert.match(html,/&lt;img src=x onerror=alert\(1\)&gt;/);
  assert.doesNotMatch(html,/<img src=x onerror=/);
- const admin=familyAdminView({fakhths:[],families:[],parents:[],invitations:[],accounts:[],
+ const admin=familyAdminContent({fakhths:[],families:[],parents:[],invitations:[],accounts:[],
   activeSupervisors:[],queue:[{id:requestId,proposed_name_ar:fake,relationship:'self',family_name:'عائلة',fakhth_name:'فخذ',email:'user@example.test',status:'submitted'}]},'b'.repeat(64),false);
  assert.doesNotMatch(admin,/<img src=x onerror=/);
 });

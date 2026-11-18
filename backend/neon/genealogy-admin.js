@@ -132,8 +132,8 @@ async function candidate(db,role,data,tribeId,user,{isMain=false}={}) {
   const dup=await db.query("select id from public.people where tribe_id=$1 and (normalized_name=$2 or lower(full_name_ar)=lower($3)) and gender=$4 and record_status<>'archived' limit 1",[tribeId,canonicalName(fullName),fullName,gender]);
   if(dup.rowCount && data.allow_duplicate_name!=='yes')throw new HttpError(409,'اسم مشابه مسجل؛ ابحث عن الشخص وحدده بدل إضافته مرة ثانية، أو أكد تشابه الأسماء');
  }
- const familyUnit=isMain?uuid(data.person_family_id):null;
- if(isMain)await getFamily(db,familyUnit,tribeId);
+ const familyUnit=uuid(data[isMain?'person_family_id':role+'_family_id']);
+ if(familyUnit)await getFamily(db,familyUnit,tribeId);
  const birth=isMain?registryDate(new URLSearchParams(data),'person_birth_date'):{date:null,precision:'unknown'};
  const born=isMain?clip(data.person_birth_place,120):null;
  const r=await db.query("insert into public.people(tribe_id,family_unit_id,given_name_ar,full_name_ar,normalized_name,gender,record_status,visibility,created_by,birth_date,birth_date_precision,birth_place) values($1,$2,$3,$4,$5,$6,'under_review','private',$7,$8,$10,$9) returning id",
@@ -294,7 +294,7 @@ function sameLineageFamily(person,role,parent){
 async function addPersonRelation(db,user,form){
  const personId=uuid(form.get('person_id'),true),person=await getPerson(db,personId);
  const role=field(form,'relation_role',30),spec=FAMILY_RELATIONS[role];
- if(!spec)throw new HttpError(400,'نوع صلة القرابة غير مدعوم');
+ if(!Object.hasOwn(FAMILY_RELATIONS,role))throw new HttpError(400,'نوع صلة القرابة غير مدعوم');
  if(role==='child'&&!['male','female'].includes(person.gender))
   throw new HttpError(409,'حدد جنس الفرد الأساسي أولًا لربط الأبناء بالأب أو الأم بصورة صحيحة');
  let parent=person;
@@ -313,7 +313,7 @@ async function addPersonRelation(db,user,form){
   const matched=await db.query("select p.id,p.tribe_id,p.full_name_ar from public.person_identifiers i join public.people p on p.id=i.person_id where i.country_code='SA' and i.identifier_type=$1 and i.identifier_hmac=$2 and i.status in ('pending','verified','disputed') limit 1",[kind,hash.digest]);
   identified=matched.rows[0]||null;
  }
- if(selectedId&&identified&&identified.id!==selectedId)
+ if(selectedId&&hash&&identified?.id!==selectedId)
   throw new HttpError(409,'رقم الهوية المدخل يعود لسجل مختلف عن الشخص المختار');
  const existingId=selectedId||identified?.id||null;
  if(identified&&!selectedId&&field(form,'confirm_reuse',5)!=='yes')
@@ -334,6 +334,7 @@ async function addPersonRelation(db,user,form){
  }else{
   const name=requiredName(fullName);
   const gender=relationGender(role,field(form,'relative_gender',20));
+  if(role==='child'&&!['male','female'].includes(gender))throw new HttpError(400,'اختر ابنًا أو ابنة بتحديد الجنس.');
   const livingStatus=field(form,'relative_living_status',20)||'unknown';
   if(!['alive','deceased','unknown'].includes(livingStatus))throw new HttpError(400,'حالة الحياة غير صالحة');
   const duplicate=await db.query("select id from public.people where tribe_id=$1 and normalized_name=$2 and record_status<>'archived' limit 1",[person.tribe_id,canonicalName(name)]);
@@ -364,6 +365,14 @@ async function addPersonRelation(db,user,form){
   await db.query("insert into public.marriages(partner_a_id,partner_b_id,start_date,status,notes) values($1,$2,$3,'reported',$4)",[person.id,relative.id,safeDate(form.get('marriage_start_date')),'إضافة إدارية تنتظر التوثيق']);
  }else if(role==='child'){
   const otherId=uuid(form.get('co_parent_id'));
+  if(!otherId)throw new HttpError(400,'اختر الأب أو الأم الآخر بالهوية أو من الأزواج المرتبطين.');
+  const coIdentity=field(form,'co_parent_identity',50);
+  if(coIdentity){
+   const coKind=field(form,'co_parent_identity_kind',30)||'national_id';
+   const coHash=identity(coIdentity,coKind);
+   const matched=await db.query("select 1 from public.person_identifiers where person_id=$1 and country_code='SA' and identifier_type=$2 and identifier_hmac=$3 and status in ('pending','verified','disputed')",[otherId,coKind,coHash.digest]);
+   if(!matched.rowCount)throw new HttpError(409,'هوية الأب أو الأم الآخر لا تطابق السجل المختار.');
+  }
   let other=null;
   if(otherId){
    const linked=await db.query("select 1 from public.marriages where ((partner_a_id=$1 and partner_b_id=$2) or (partner_a_id=$2 and partner_b_id=$1)) and status in ('reported','current') limit 1",[person.id,otherId]);
@@ -538,7 +547,7 @@ export async function genealogyAction(user,form){
  const db=await pool.connect();
  try{
   await db.query('begin');
-  if(['create_unit','edit_unit','withdraw_unit','delete_unit_draft'].includes(action)){
+  if(['create_unit','edit_unit','withdraw_unit','delete_unit_draft','create_tree','add_relation','edit_person'].includes(action)){
    await db.query('select pg_advisory_xact_lock(723145, 1)');
   }
   const result=await entry[1](db,user,form);
@@ -553,8 +562,9 @@ export async function genealogyAction(user,form){
  }
  finally{db.release();}
 }
-export async function genealogyIdentityLookup(user,req,form){
+export async function genealogyIdentityLookup(user,req,form,{relative=false}={}){
  await permit(user,'identity.read');
+ if(relative)await permit(user,'identity.edit');
  const token=String(form.get('csrf')||''),expected=csrfFor(user,req);
  if(!/^[0-9a-f]{64}$/.test(token)||!timingSafeEqual(Buffer.from(token,'hex'),Buffer.from(expected,'hex')))
    throw new HttpError(403,'رمز الحماية غير صالح');
@@ -563,11 +573,13 @@ export async function genealogyIdentityLookup(user,req,form){
  const hash=identity(raw,kind);
  const recent=await pool.query("select count(*)::int as total from public.permission_audit_events where actor_user_id=$1 and event_type='genealogy_identity_lookup' and created_at > now() - interval '1 minute'",[user.id]);
  if(Number(recent.rows[0]?.total||0)>=12)throw new HttpError(429,'تجاوزت الحد الآمن لطلبات مطابقة الهوية؛ حاول بعد دقيقة');
- const r=await pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,pi.masked_value from public.person_identifiers pi join public.people p on p.id=pi.person_id where pi.identifier_type=$1 and pi.identifier_hmac=$2 and pi.status in ('pending','verified','disputed') limit 1",[kind,hash.digest]);
+ const r=await pool.query("select p.id,p.full_name_ar,p.gender,p.record_status,pi.masked_value,f.name_ar family_name,k.name_ar fakhth_name from public.person_identifiers pi join public.people p on p.id=pi.person_id left join public.lineage_units f on f.id=p.family_unit_id left join public.lineage_family_fakhth_links l on l.family_unit_id=p.family_unit_id left join public.lineage_units k on k.id=l.fakhth_unit_id where pi.country_code='SA' and pi.identifier_type=$1 and pi.identifier_hmac=$2 and pi.status in ('pending','verified','disputed') limit 1",[kind,hash.digest]);
  const found=r.rows[0]||null;
  const db=await pool.connect();
  try{await journal(db,user,'genealogy_identity_lookup','person_identifiers',found?.id||null,{found:!!found,identifierType:kind});}
  finally{db.release();}
+ if(relative&&found&&(found.record_status==='archived'||found.id===form.get('person_id')))
+  throw new HttpError(409,'هذا السجل مؤرشف أو هو نفس سجل الفرد المفتوح.');
  return {matched:!!found,record:found};
 }
 export async function genealogyData(user,url){
@@ -609,7 +621,8 @@ export async function genealogyData(user,url){
   queryWhen(permissions[1]&&(unitRegistry||view==='sources'),'select id,tribe_id,title,source_type,author,publication_year from public.sources order by created_at desc,id'),
   queryWhen(personRegistry&&!personEditor,"select (select count(*) from public.people) people,(select count(*) from public.people where record_status='under_review') drafts,(select count(*) from public.lineage_units) units,(select count(*) from public.lineage_seed_reviews where review_status='needs_review') unit_reviews,(select count(*) from public.people where birth_date is null) missing_birth,(select count(*) from public.people where family_unit_id is null) missing_family"),
   queryWhen(personEditor||creation,"select p.id,p.full_name_ar,p.gender,p.record_status,(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) identity_mask from public.people p where p.record_status<>'archived' order by p.full_name_ar limit 400"),
-  queryWhen(personEditor||creation||unitRegistry&&permissions[1],'select id,tribe_id,parent_id,unit_type,name_ar from public.lineage_units order by name_ar limit 1200'),
+  queryWhen(personEditor||creation||unitRegistry&&permissions[1],
+   'select u.id,u.tribe_id,u.parent_id,u.unit_type,u.name_ar,l.fakhth_unit_id,f.unit_id is not null registered_fakhth from public.lineage_units u left join public.lineage_family_fakhth_links l on l.family_unit_id=u.id left join public.lineage_fakhths f on f.unit_id=u.id order by u.name_ar,u.id'),
   queryWhen(personEditor,"select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.given_name_ar,p.middle_name_ar,p.surname_ar,p.birth_date,p.birth_date_precision,p.death_date,p.death_date_precision,p.living_status,p.birth_place,p.biography,pp.* from public.people p left join public.person_private pp on pp.person_id=p.id where p.id=$1 limit 1",[focusPersonId]),
   queryWhen(unitEditor,'select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,l.name_en,l.description,s.title as source_title from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id left join public.sources s on s.id=r.source_id where l.id=$1 limit 1',[focusUnitId]),
   queryWhen(personEditor||creation&&childOfId,

@@ -20,7 +20,8 @@ test('genealogy editor renders full private fields and keeps existing parents se
  assert.ok(html.includes('&lt;script&gt;'));
  assert.ok(!html.includes('<script>alert(1)</script>'));
  assert.match(html,/name="father_id"/);
- assert.match(html,/option value="" disabled/);
+ assert.ok(html.includes('type="hidden" name="father_id" value="'+person.father_id+'"'));
+ assert.doesNotMatch(html,/<select name="father_id"/);
  assert.ok(html.includes('creationExtras')===false);
  assert.match(html, /<summary>الملاحظات الداخلية<\/summary>/);
 });
@@ -95,4 +96,18 @@ test('the editor displays a partial birth date without inventing a day or month'
  const data={people:[],units:[],sources:[],tribes:[],directory:[],stats:{},canEditPeople:true,
    focusedPerson:{id:'example',full_name_ar:'شخص تجريبي',birth_date:'1980-01-01',birth_date_precision:'year'}};
  assert.match(genealogyView(data,'test-token'),/name="birth_date" value="1980"/);
+});
+
+test('editing a relative uses identity lookup and keeps family options grouped by registered fakhth',()=>{
+ const fakhth={id:'fakhth',unit_type:'clan',registered_fakhth:true,name_ar:'الفخذ'};
+ const family={id:'family',unit_type:'family',fakhth_unit_id:fakhth.id,name_ar:'العائلة'};
+ const data={people:[],units:[],sources:[],tribes:[],directory:[],directoryUnits:[fakhth,family],stats:{},canEditPeople:true,
+  focusedPerson:{id:'example',full_name_ar:'شخص تجريبي',family_unit_id:family.id}};
+ const html=genealogyView(data,'token');
+ assert.match(html,/data-fakhth><option value="">اختر الفخذ/);
+ assert.match(html,/value="fakhth" data-tribe="" selected/);
+ assert.match(html,/value="family" data-fakhth="fakhth" data-tribe="" selected/);
+ assert.match(html,/type="hidden" name="relative_id"/);
+ assert.match(html,/name="co_parent_identity"/);
+ assert.doesNotMatch(html,/<select name="relative_id"/);
 });

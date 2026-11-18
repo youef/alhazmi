@@ -63,7 +63,7 @@ const select=(label,name,rows,key,text,required=false)=>
 const pills=x=>'<span class="family-pill '+(x==='rejected'?'negative':x==='needs_evidence'?'warning':'')+'">'+e(status[x]||x||'—')+'</span>';
 const row=xs=>'<tr>'+xs.map(x=>'<td>'+x+'</td>').join('')+'</tr>';
 const table=(columns,rows)=>rows.length?'<div class="family-table-wrap"><table class="family-table"><thead><tr>'+columns.map(x=>'<th>'+e(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>':'<div class="family-empty">لا توجد بيانات ضمن هذا القسم حاليًا.</div>';
-export function familyAdminView(data,csrf,done){
+export function familyAdminContent(data,csrf){
  const inviteFields='<label>البريد الإلكتروني للمستخدم<input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="user@example.com"></label>'
  +'<label>الاسم المعروض<input name="name" maxlength="100" placeholder="اسم الشخص"></label>'
  +'<label>مستوى الإشراف<select name="role" required><option value="diwan_fakhth_supervisor">مشرف فخذ</option><option value="diwan_family_supervisor">مشرف عائلة</option><option value="diwan_parent_supervisor">مشرف أسرة</option></select></label>'
@@ -124,18 +124,16 @@ export function familyAdminView(data,csrf,done){
   +'<label class="family-checkbox"><input type="checkbox" name="confirm_evidence" value="yes" required> طابقت المستندات مع صاحب الحساب</label>';
  const linkCard=data.parents.length?form('/admin/supervisors','link_account',csrf,linkFields,'ربط الحساب بالشخص'):'<div class="family-empty">لا توجد سجلات أشخاص موثّقة بعد. أضف سجلاً أوليًا ثم اعتمده على مرحلتين.</div>';
   const content='<div class="family-shell">'
- +'<div class="family-breadcrumb"><a href="/admin">الإدارة</a> / إدارة المشرفين والأنساب</div>'
- +'<div class="family-banner"><h1>مركز الإشراف على الأفخاذ والعوائل</h1><p>توزيع الأدوار وربط كل مشرف بالفخذ أو العائلة أو الشخص الموثّق، وإدارة طلبات إضافة أفراد الأسرة ومراجعة القرابة.</p></div>'
- +(done?'<div class="family-callout" role="status">تم تنفيذ الإجراء وحفظه بنجاح.</div>':'')
+ +'<nav class="family-actions family-index" aria-label="أقسام الإشراف"><a href="#supervisor-invite">دعوة إشراف</a><a href="#supervisor-active">المشرفون النشطون</a><a href="#supervisor-link">ربط الحسابات</a><a href="#supervisor-review">طلبات القرابة</a></nav>'
  +'<div class="family-stats"><div class="family-stat"><strong>'+fmt(data.fakhths.length)+'</strong><small>الأفخاذ المسجلة</small></div><div class="family-stat"><strong>'+fmt(data.families.length)+'</strong><small>العائلات المرتبطة</small></div><div class="family-stat"><strong>'+fmt(data.queue.filter(x=>['submitted','under_review','needs_evidence'].includes(x.status)).length)+'</strong><small>طلبات حديثة بانتظار القرار</small></div></div>'
- +'<div class="family-grid"><section class="family-card"><h2>إضافة مستخدم ومنح نطاق إشراف</h2><p class="family-sub">اختر الفخذ الموجود فعلًا، ثم عائلة منه للمستويين الثاني والثالث.</p>'+form('/admin/supervisors','invite',csrf,inviteFields,'إنشاء دعوة إشراف')+'</section>'
+ +'<div class="family-grid"><section class="family-card" id="supervisor-invite"><h2>دعوة مشرف جديد</h2><p class="family-sub">اختر الفخذ الموجود فعلًا، ثم عائلة منه للمستويين الثاني والثالث.</p>'+form('/admin/supervisors','invite',csrf,inviteFields,'إنشاء دعوة إشراف')+'</section>'
  +'<section class="family-card"><h2>حسابات المستخدمين المسجلة</h2>'+table(['المستخدم','البريد'],data.accounts.map(u=>row([e(u.name||'مستخدم'),'<span dir="ltr">'+e(u.email)+'</span>'])))+'</section></div>'
  +'<section class="family-card"><h2>سجل دعوات الإشراف</h2>'+table(['الحساب','الدور','الفخذ','الحالة','أنشئت','إلغاء'],pendingInvites)+'</section>'
- +'<section class="family-card"><h2>المشرفون الفعّالون وسحب صلاحياتهم</h2>'+table(['المستخدم','الدور','النطاق','ينتهي','الإجراء'],supervisors)+'</section>'
- +'<section class="family-card"><h2>ربط حساب مستخدم بسجل نسب موثّق</h2><p class="family-callout family-warning">الربط يتطلب التحقق المستقل من هوية صاحب الحساب؛ مجرد تطابق الاسم أو البريد لا يكفي.</p>'+linkCard+'</section>'
- +'<section class="family-card"><h2>مراجعة إضافات الأسرة والقرابة</h2><p class="family-callout family-warning">رقم الهوية وحده لا يثبت النسب. القبول الأولي ينشئ سجلًا خاصًا قيد التحقق، وروابط الأبوة أو الزواج تبقى غير موثّقة حتى مراجعتها.</p>'+table(['الاسم','صلة القرابة','النطاق','مقدم الطلب','الحالة','الإجراء'],queue)+'</section>'
+ +'<section class="family-card" id="supervisor-active"><h2>المشرفون النشطون</h2>'+table(['المستخدم','الدور','النطاق','ينتهي','الإجراء'],supervisors)+'</section>'
+ +'<section class="family-card" id="supervisor-link"><h2>ربط حساب بسجل نسب</h2><p class="family-callout family-warning">الربط يتطلب التحقق المستقل من هوية صاحب الحساب؛ مجرد تطابق الاسم أو البريد لا يكفي.</p>'+linkCard+'</section>'
+ +'<section class="family-card" id="supervisor-review"><h2>مراجعة طلبات القرابة</h2><p class="family-callout family-warning">رقم الهوية وحده لا يثبت النسب. القبول الأولي ينشئ سجلًا خاصًا قيد التحقق، وروابط الأبوة أو الزواج تبقى غير موثّقة حتى مراجعتها.</p>'+table(['الاسم','صلة القرابة','النطاق','مقدم الطلب','الحالة','الإجراء'],queue)+'</section>'
  +'<div class="family-actions"><a class="family-btn secondary" href="/admin">العودة للإدارة</a><a class="family-btn secondary" href="/family/manage">بوابة إدارة الأسرة</a></div></div>';
- return page('مشرفو الأفخاذ والعوائل', '<style>'+css+'</style>'+content,true);
+ return '<style>'+css+'</style>'+content;
 }
 export function familyMemberView(data,csrf,done){
  const inviteCards=data.invites.map(i=>'<div class="family-details"><strong>'+e(status[i.role_key])+'</strong><div class="family-slim">تنتهي الدعوة: '+e(date(i.expires_at))+'</div>'+form('/family/manage','accept',csrf,

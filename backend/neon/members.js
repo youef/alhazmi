@@ -3,7 +3,7 @@ import { accountFromId, authorized, HttpError, route } from './shared.js';
 import { accessibleModules, readModule } from './api.js';
 import { ADMIN_SECTIONS, adminAction, adminData, csrfFor, lineageTreeAction } from './admin.js';
 import { familyAction, familyAdminData, familySupervisorData } from './family-management.js';
-import { familyAdminView, familyMemberView } from './family-views.js';
+import { familyMemberView } from './family-views.js';
 import { adminView } from './admin-views.js';
 import { genealogyIdentityLookup } from './genealogy-admin.js';
 import { lineageTreeData } from './lineage-tree-admin.js';
@@ -20,7 +20,7 @@ function headersForPage() {
   return new Headers({
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store, private',
-    'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline' https://youef.github.io/alhazmi/brand/; img-src https://youef.github.io/alhazmi/brand/; script-src 'sha256-${inlineScriptHash}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
+    'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline' https://youef.github.io/alhazmi/brand/; img-src https://youef.github.io/alhazmi/brand/; connect-src 'self'; script-src 'sha256-${inlineScriptHash}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
     'X-Content-Type-Options': 'nosniff',
     // HTML form submissions need a non-opaque Origin for the CSRF check.
     'Referrer-Policy': 'same-origin',
@@ -174,7 +174,7 @@ export default {
         if (request.method === 'POST')
           return redirect(headers, await familyAction(account, request, await readForm(request), 'admin'));
         const data = await familyAdminData(account);
-        return html(familyAdminView(data, csrfFor(account,request), url.searchParams.get('done') === '1'));
+        return html(adminView('supervisors',user,data,{},csrfFor(account,request),url.searchParams.get('done') === '1'));
       }
       if (path === '/family/manage') {
         if (request.method === 'POST')
@@ -195,6 +195,17 @@ export default {
             if(!result.matched){data.rows=[];data.total=0;}
             data.identityResult=result;
             return html(adminView(section,user,data,filter,csrfFor(account,request),false));
+          }
+          if(section==='genealogy' && submitted.get('operation')==='lookup_relative_identity'){
+            const responseHeaders={'Cache-Control':'no-store, private','X-Content-Type-Options':'nosniff'};
+            try {
+              const result=await genealogyIdentityLookup(account,request,submitted,{relative:true});
+              return Response.json(result,{headers:responseHeaders});
+            } catch(error) {
+              if(!(error instanceof HttpError))throw error;
+              return Response.json({error:error.status===403?'الصلاحية غير متاحة.':error.message},
+                {status:error.status,headers:responseHeaders});
+            }
           }
           if(section==='genealogy' && submitted.get('operation')==='lookup_identity'){
             const result=await genealogyIdentityLookup(account,request,submitted);
