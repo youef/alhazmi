@@ -518,7 +518,7 @@ async function deleteUnitDraft(db,user,form){
  if(!entry)throw new HttpError(404,'الوحدة غير موجودة');
  const review=(await db.query('select review_status,raw_source_path from public.lineage_seed_reviews where unit_id=$1 for update',[id])).rows[0];
  if(!review||review.review_status!=='needs_review'||!String(review.raw_source_path).startsWith('admin/manual/'))
-   throw new HttpError(409,'لا يجوز حذف وحدة معتمدة أو مستوردة؛ استخدم إيقاف النشر والمراجعة');
+   throw new HttpError(409,'الحذف الدائم متاح للمسودات اليدوية غير المرتبطة فقط. إذا كانت الوحدة منشورة، اختر إيقاف النشر للمراجعة.');
  const dep=await db.query('select 1 from public.lineage_units where parent_id=$1 union all select 1 from public.people where family_unit_id=$1 union all select 1 from public.lineage_family_fakhth_links where fakhth_unit_id=$1 limit 1',[id]);
  if(dep.rowCount)throw new HttpError(409,'الوحدة تحتوي أفرادًا أو فروعًا؛ احفظ التسلسل واستخدم المراجعة');
  await db.query('delete from public.lineage_family_fakhth_links where family_unit_id=$1',[id]);
@@ -624,7 +624,13 @@ export async function genealogyData(user,url){
   queryWhen(personEditor||creation||unitRegistry&&permissions[1],
    'select u.id,u.tribe_id,u.parent_id,u.unit_type,u.name_ar,l.fakhth_unit_id,f.unit_id is not null registered_fakhth from public.lineage_units u left join public.lineage_family_fakhth_links l on l.family_unit_id=u.id left join public.lineage_fakhths f on f.unit_id=u.id order by u.name_ar,u.id'),
   queryWhen(personEditor,"select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.given_name_ar,p.middle_name_ar,p.surname_ar,p.birth_date,p.birth_date_precision,p.death_date,p.death_date_precision,p.living_status,p.birth_place,p.biography,pp.* from public.people p left join public.person_private pp on pp.person_id=p.id where p.id=$1 limit 1",[focusPersonId]),
-  queryWhen(unitEditor,'select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,l.name_en,l.description,s.title as source_title from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id left join public.sources s on s.id=r.source_id where l.id=$1 limit 1',[focusUnitId]),
+  queryWhen(unitEditor,`select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,l.name_en,l.description,
+   s.title as source_title,r.review_status,coalesce(r.raw_source_path like 'admin/manual/%',false) as manual_draft,
+   (exists (select 1 from public.lineage_units child where child.parent_id=l.id)
+   or exists (select 1 from public.people p where p.family_unit_id=l.id)
+   or exists (select 1 from public.lineage_family_fakhth_links f where f.fakhth_unit_id=l.id)) as has_links
+   from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id
+   left join public.sources s on s.id=r.source_id where l.id=$1 limit 1`,[focusUnitId]),
   queryWhen(personEditor||creation&&childOfId,
     "select p.id,p.full_name_ar,p.gender,p.record_status from public.people p where "+
     "(p.id=$1 and p.record_status<>'archived') or p.id in "+

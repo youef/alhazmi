@@ -336,16 +336,25 @@ function editUnitCard(data,csrf){
    '<label>الأصل'+unitSelect(data,unit.parent_id,'— دون أصل —',data.directoryUnits)+'</label>'+
    '<p class="gen-muted">يعود كل تعديل إلى قائمة المراجعة. نقل وحدة تحتوي أبناء غير مسموح مباشرة.</p>',
    'حفظ تعديل الوحدة');
- const withdraw=form('withdraw_unit',csrf,h('id',unit.id)+
-   '<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>أؤكد إيقاف عرض هذه الوحدة حتى اكتمال المراجعة</label>','إيقاف النشر');
- const remove=form('delete_unit_draft',csrf,h('id',unit.id)+
-   '<p class="gen-muted">الحذف متاح للسجلات اليدوية الجديدة غير المعتمدة والخالية من أي روابط.</p>'+
-   '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>تأكيد حذف وحدة مسودة</label>','حذف المسودة');
- return '<section class="gen-section" id="gen-unit-edit"><div class="gen-section-head"><div><h2>تعديل وحدة النسب: '+e(unit.name_ar)+'</h2><small>تعديل المسمى والتسلسل مع سجل تدقيق</small></div>'+
+ const published=unit.review_status==='approved';
+ const canDelete=unit.manual_draft&&unit.review_status==='needs_review'&&!unit.has_links;
+ const withdraw=published?'<details class="gen-details"><summary>إيقاف النشر للمراجعة</summary>'+
+  form('withdraw_unit',csrf,h('id',unit.id)+
+   '<p class="gen-muted">تُزال الوحدة من العرض المعتمد وتبقى محفوظة مع روابطها في قاعدة البيانات.</p>'+
+   '<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>أؤكد إيقاف نشر الوحدة</label>',
+   'إيقاف النشر')+'</details>':'';
+ const removal=canDelete?'<details class="gen-details gen-danger"><summary>حذف المسودة</summary>'+
+  form('delete_unit_draft',csrf,h('id',unit.id)+
+   '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>أؤكد حذف المسودة نهائيًا</label>',
+   'حذف المسودة')+'</details>':'<p class="gen-note">'+(unit.has_links?
+   'لهذه الوحدة سجلات مرتبطة. تُحفظ روابطها عند إيقاف النشر.':
+   'الحذف الدائم متاح للمسودات اليدوية غير المعتمدة فقط.')+'</p>';
+ return '<section class="gen-section" id="gen-unit-edit"><div class="gen-section-head"><div><h2>'+e(unit.name_ar)+'</h2>'+
+   '<span class="gen-pill">'+e(status[unit.review_status]||unit.review_status||'بلا مراجعة')+'</span></div>'+
    '<a class="gen-compact-button" href="/admin/genealogy?view=units">العودة إلى الوحدات</a></div>'+
-   '<div class="gen-form-grid"><div>'+update+'</div><div class="gen-bundle">'+
-   '<details class="gen-details"><summary>إيقاف النشر للمراجعة</summary>'+withdraw+'</details>'+
-   '<details class="gen-details"><summary>حذف مسودة الوحدة</summary>'+remove+'</details></div></div></section>';
+   (data.unitError?'<p class="gen-error" role="alert">'+e(data.unitError)+'</p>':'')+
+   '<div class="gen-form-grid"><div>'+update+'</div><div class="gen-bundle"><h3>النشر والحذف</h3>'+withdraw+removal+'</div></div></section>';
+
 }
 export function genealogyView(data,csrf){
  const metrics=[

@@ -185,4 +185,5 @@ export const genealogyStyles=`
 @media(max-width:680px){
  .gen-family-select,.gen-lookup-fields{grid-template-columns:1fr}
 }
+.gen-error{background:#fff0ee;color:#8e322b;padding:12px;border-radius:9px;margin-bottom:12px}
 `;

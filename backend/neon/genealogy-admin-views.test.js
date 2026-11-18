@@ -111,3 +111,18 @@ test('editing a relative uses identity lookup and keeps family options grouped b
  assert.match(html,/name="co_parent_identity"/);
  assert.doesNotMatch(html,/<select name="relative_id"/);
 });
+
+test('unit editor offers withdrawal for approved records and deletion only for unlinked manual drafts',()=>{
+ const unit={id:'unit',name_ar:'عائلة تجريبية',review_status:'approved',manual_draft:false,has_links:true};
+ const data={people:[],units:[],directoryUnits:[],sources:[],tribes:[],stats:{},canEditUnits:true};
+ const approved=genealogyView({...data,focusedUnit:unit},'token');
+ assert.match(approved,/value="withdraw_unit"/);
+ assert.doesNotMatch(approved,/value="delete_unit_draft"/);
+ const manual={...unit,review_status:'needs_review',manual_draft:true,has_links:false};
+ const draft=genealogyView({...data,focusedUnit:manual},'token');
+ assert.match(draft,/value="delete_unit_draft"/);
+ assert.doesNotMatch(draft,/value="withdraw_unit"/);
+ const imported=genealogyView({...data,focusedUnit:{...manual,manual_draft:false},unitError:'<مرفوض>'},'token');
+ assert.doesNotMatch(imported,/value="delete_unit_draft"/);
+ assert.match(imported,/role="alert">&lt;مرفوض&gt;/);
+});

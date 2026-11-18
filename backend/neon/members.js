@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { accountFromId, authorized, HttpError, route } from './shared.js';
+import { accountFromId, authorized, HttpError, isId, route } from './shared.js';
 import { accessibleModules, readModule } from './api.js';
 import { ADMIN_SECTIONS, adminAction, adminData, csrfFor, lineageTreeAction } from './admin.js';
 import { familyAction, familyAdminData, familySupervisorData } from './family-management.js';
@@ -214,7 +214,19 @@ export default {
             data.lookup=result;
             return html(adminView(section,user,data,filter,csrfFor(account,request),false));
           }
-          return redirect(headers, await adminAction(account, section, request, submitted));
+          try {
+            return redirect(headers, await adminAction(account, section, request, submitted));
+          } catch(error) {
+            const unitId=submitted.get('id');
+            const unitAction=['edit_unit','withdraw_unit','delete_unit_draft'].includes(submitted.get('operation'));
+            if(section!=='genealogy'||!unitAction||!isId(unitId||'')||
+                !(error instanceof HttpError)||![400,409].includes(error.status))throw error;
+            url.searchParams.set('unit_id',unitId);
+            const {data,filter}=await adminData(account,section,url);
+            if(!data.focusedUnit)throw error;
+            data.unitError=error.message;
+            return html(adminView(section,user,data,filter,csrfFor(account,request)),error.status);
+          }
         }
         const {data, filter} = await adminData(account, section, url);
         return html(adminView(section, user, data, filter, csrfFor(account, request), url.searchParams.get('done') === '1'));
