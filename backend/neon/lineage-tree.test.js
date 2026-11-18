@@ -61,3 +61,27 @@ test('the tree validates CSRF and commits the family parent before the registry 
   assert.equal(statements.at(-1),'commit');
 });
 
+
+test('the map follows the selected family and distinguishes the registered fakhth from its direct parent', () => {
+  const section={id:'section',unit_type:'clan',parent_id:fakhth.id,name_ar:'القسم الوسيط'};
+  const linked={...family,parent_id:section.id,fakhth_unit_id:fakhth.id};
+  const html=lineageTreeView({items:[root,fakhth,section,linked],focused:linked},new URLSearchParams({unit:linked.id}),'');
+  assert.match(html,/id="tree-map"/);
+  assert.match(html,/class="tree-route"[\s\S]+الفرع الأول[\s\S]+الفخذ الأول[\s\S]+القسم الوسيط[\s\S]+أسرة تجريبية/);
+  assert.match(html,/الأصل المباشر<\/dt><dd>[\s\S]+القسم الوسيط/);
+  assert.match(html,/الفخذ المرتبط<\/dt><dd>[\s\S]+الفخذ الأول/);
+  assert.doesNotMatch(html,/\/admin\/members\?fakhth/);
+});
+
+test('the map paginates many children and the list can open each child on the map', () => {
+ const children=Array.from({length:14},(_,index)=>({
+  id:'child-'+index,parent_id:root.id,unit_type:'family',name_ar:'السجل '+index,
+ }));
+ const data={items:[root,...children],focused:root};
+ const html=lineageTreeView(data,new URLSearchParams({children_page:'2'}),'');
+ assert.doesNotMatch(html,/السجل 0/);
+ assert.match(html,/السجل 13/);
+ assert.match(html,/children_page=1#tree-children/);
+ const list=lineageTreeView(data,new URLSearchParams({view:'list'}),'');
+ assert.match(list,/view=map&amp;unit=child-13#tree-map/);
+});
