@@ -323,7 +323,7 @@ export async function adminAction(u,section,req,form){
   const op=String(form.get('operation')||''),id=String(form.get(op==='add_relation'?'person_id':'id')||'');
   if(op==='create_tree'&&isId(changed))return '/admin/genealogy?person_id='+encodeURIComponent(changed)+'&done=1#gen-person-edit';
   if(['create_unit','edit_unit'].includes(op)&&isId(changed))return '/admin/genealogy?unit_id='+encodeURIComponent(changed)+'&done=1#gen-unit-edit';
-  if(op==='withdraw_unit'&&isId(id))return '/admin/genealogy?unit_id='+encodeURIComponent(id)+'&done=1#gen-unit-edit';
+  if(['withdraw_unit','publish_unit'].includes(op)&&isId(id))return '/admin/genealogy?unit_id='+encodeURIComponent(id)+'&done=1#gen-unit-edit';
   if(op==='delete_unit_draft')return '/admin/genealogy?view=units&done=1';
   if(op==='add_relation'&&isId(id))return '/admin/genealogy?person_id='+encodeURIComponent(id)+'&done=1#gen-family-relations';
   return op==='edit_person'&&isId(id)?'/admin/genealogy?person_id='+encodeURIComponent(id)+'&done=1#gen-person-edit':'/admin/genealogy?done=1';

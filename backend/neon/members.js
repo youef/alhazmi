@@ -218,7 +218,7 @@ export default {
             return redirect(headers, await adminAction(account, section, request, submitted));
           } catch(error) {
             const unitId=submitted.get('id');
-            const unitAction=['edit_unit','withdraw_unit','delete_unit_draft'].includes(submitted.get('operation'));
+            const unitAction=['edit_unit','withdraw_unit','publish_unit','delete_unit_draft'].includes(submitted.get('operation'));
             if(section!=='genealogy'||!unitAction||!isId(unitId||'')||
                 !(error instanceof HttpError)||![400,409].includes(error.status))throw error;
             url.searchParams.set('unit_id',unitId);

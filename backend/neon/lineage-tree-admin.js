@@ -7,7 +7,19 @@ export async function lineageTreeData(user, url) {
   if (!admin || !write) {
     const { items } = await readModule('tree', user);
     if (!items.length) return { items, canManage: false };
-    const ids = items.map(item => item.id);
+    const byId = new Map(items.map(item=>[item.id,item]));
+    const published = items.filter(item=>{
+      const seen=new Set([item.id]);
+      for(let parentId=item.parent_id;parentId;){
+        const parent=byId.get(parentId);
+        if(!parent||seen.has(parentId))return false;
+        seen.add(parentId);
+        parentId=parent.parent_id;
+      }
+      return true;
+    });
+    const ids = published.map(item => item.id);
+    if (!ids.length) return { items:[], canManage:false };
     const [fakhth, links] = await Promise.all([
       pool.query(`select unit_id,major_branch_id from public.lineage_fakhths
         where unit_id=any($1::uuid[]) and review_status='approved' and verified_at is not null and verified_by is not null`,[ids]),
@@ -19,7 +31,7 @@ export async function lineageTreeData(user, url) {
     const relationships = new Map(links.rows.map(row=>[row.family_unit_id,row.fakhth_unit_id]));
     const linkedFakhths = new Set(relationships.values());
     const visible = new Set(ids);
-    const units = items.map(item=>({
+    const units = published.map(item=>({
       ...item,
       registered_fakhth:branches.has(item.id)||linkedFakhths.has(item.id),
       major_branch_id:visible.has(branches.get(item.id))?branches.get(item.id):null,
@@ -35,6 +47,7 @@ export async function lineageTreeData(user, url) {
     pool.query(`select l.id,l.parent_id,l.unit_type,l.name_ar,r.review_status,
         f.unit_id is not null as registered_fakhth, f.major_branch_id, link.fakhth_unit_id,
         r.review_status='needs_review' and r.raw_source_path like 'admin/manual/%'
+          and not exists (select 1 from public.permission_audit_events a where a.event_type='genealogy_unit_publication_approved' and a.metadata->>'id'=l.id::text)
           and not exists (select 1 from public.lineage_units child where child.parent_id=l.id)
           and not exists (select 1 from public.people p where p.family_unit_id=l.id)
           and not exists (select 1 from public.lineage_family_fakhth_links x where x.fakhth_unit_id=l.id) as can_delete

@@ -334,7 +334,8 @@ function editUnitCard(data,csrf){
    '<label>الوصف<textarea name="description" maxlength="2000" rows="4">'+e(unit.description)+'</textarea></label>'+
    (unit.source_title?'<p class="gen-note">المصدر: '+e(unit.source_title)+'</p>':'')+
    '<label>الأصل'+unitSelect(data,unit.parent_id,'— دون أصل —',data.directoryUnits)+'</label>'+
-   '<p class="gen-muted">يعود كل تعديل إلى قائمة المراجعة. نقل وحدة تحتوي أبناء غير مسموح مباشرة.</p>',
+   (unit.registered_fakhth&&Number(unit.child_count)>0?'<label class="gen-check"><input type="checkbox" name="confirm_subtree" value="yes">أؤكد نقل الفخذ مع توابعه عند تغيير الأصل</label>':'')+
+   '<p class="gen-muted">يعود كل تعديل إلى قائمة المراجعة. نقل الفخذ ينقل الوحدات التابعة معه إلى الفرع الجديد بعد التأكيد.</p>',
    'حفظ تعديل الوحدة');
  const published=unit.review_status==='approved';
  const canDelete=unit.manual_draft&&unit.review_status==='needs_review'&&!unit.has_links;
@@ -343,6 +344,7 @@ function editUnitCard(data,csrf){
    '<p class="gen-muted">تُزال الوحدة من العرض المعتمد وتبقى محفوظة مع روابطها في قاعدة البيانات.</p>'+
    '<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>أؤكد إيقاف نشر الوحدة</label>',
    'إيقاف النشر')+'</details>':'';
+ const publish=data.canPublish&&['needs_review','verified'].includes(unit.review_status)?form('publish_unit',csrf,h('id',unit.id)+'<label class="gen-check"><input type="checkbox" name="confirm" value="yes" required>راجعت المصدر وتسلسل الوحدة وأوافق على النشر</label>','اعتماد النشر'):'';
  const removal=canDelete?'<details class="gen-details gen-danger"><summary>حذف المسودة</summary>'+
   form('delete_unit_draft',csrf,h('id',unit.id)+
    '<label class="gen-check"><input type="checkbox" name="confirm" value="delete" required>أؤكد حذف المسودة نهائيًا</label>',
@@ -353,7 +355,7 @@ function editUnitCard(data,csrf){
    '<span class="gen-pill">'+e(status[unit.review_status]||unit.review_status||'بلا مراجعة')+'</span></div>'+
    '<a class="gen-compact-button" href="/admin/genealogy?view=units">العودة إلى الوحدات</a></div>'+
    (data.unitError?'<p class="gen-error" role="alert">'+e(data.unitError)+'</p>':'')+
-   '<div class="gen-form-grid"><div>'+update+'</div><div class="gen-bundle"><h3>النشر والحذف</h3>'+withdraw+removal+'</div></div></section>';
+   '<div class="gen-form-grid"><div>'+update+'</div><div class="gen-bundle"><h3>النشر والحذف</h3>'+publish+withdraw+removal+'</div></div></section>';
 
 }
 export function genealogyView(data,csrf){

@@ -433,6 +433,13 @@ async function checkUnit(db,unitId,tribeId){
  if(!r.rowCount)throw new HttpError(400,'وحدة النسب أو القسم غير موجود');
  return r.rows[0];
 }
+function validateUnitParent(type,parent,registered=false){
+ const kind=parent?.unit_type;
+ const allowed={branch:[],clan:['branch','clan'],subclan:['branch','clan','subclan'],family:['subclan','clan','family'],house:['family','house']};
+ if(type==='branch'&&!parent)return;
+ if(!parent||!(registered&&kind==='branch')&&!allowed[type]?.includes(kind))
+  throw new HttpError(400,'الأصل المختار لا يتوافق مع نوع الوحدة. اختر أصلًا من تسلسل القبيلة.');
+}
 async function createUnit(db,user,form){
  const tribeId=uuid(form.get('tribe_id'),true),parentId=uuid(form.get('parent_id'));
  const type=field(form,'unit_type',20),name=requiredName(field(form,'name',150));
@@ -441,11 +448,11 @@ async function createUnit(db,user,form){
  await tribeExists(db,tribeId);
  const source=(await db.query('select id from public.sources where id=$1 and tribe_id=$2',[sourceId,tribeId])).rows[0];
  if(!source)throw new HttpError(400,'المصدر يجب أن يتبع القبيلة');
- if(parentId)await checkUnit(db,parentId,tribeId);
+ validateUnitParent(type,await checkUnit(db,parentId,tribeId));
  const registryParent=['family','subclan'].includes(type)?await registrationParent(db,parentId,tribeId,type):null;
  const d=await db.query("select id from public.lineage_units where tribe_id=$1 and parent_id is not distinct from $2 and normalized_name=$3 limit 1",[tribeId,parentId,canonicalName(name)]);
  if(d.rowCount)throw new HttpError(409,'وحدة باسم مطابق موجودة تحت الأصل نفسه');
- const r=await db.query('insert into public.lineage_units(tribe_id,parent_id,unit_type,name_ar,normalized_name) values($1,$2,$3,$4,$5) returning id',[tribeId,parentId,type,name,canonicalName(name)]);
+ const r=await db.query('insert into public.lineage_units(tribe_id,parent_id,unit_type,name_ar,normalized_name,name_en,description) values($1,$2,$3,$4,$5,$6,$7) returning id',[tribeId,parentId,type,name,canonicalName(name),field(form,'name_en',150)||null,field(form,'description',2000)||null]);
  const id=r.rows[0].id;
  await db.query("insert into public.lineage_seed_reviews(unit_id,source_id,review_status,raw_source_path,reviewer_note) values($1,$2,'needs_review',$3,$4)",[id,sourceId,'admin/manual/'+id,'إضافة جديدة تحتاج تحققًا قبل النشر']);
  if(type==='subclan'){
@@ -459,23 +466,42 @@ async function createUnit(db,user,form){
  await journal(db,user,'genealogy_unit_created','lineage_units',id,{unitType:type,sourceId,parentId,needsReview:true});
  return id;
 }
+async function validateFakhthTransfer(db,id,tribeId,parent,confirmed){
+ if(!confirmed)throw new HttpError(400,'أكّد نقل الفخذ مع جميع العائلات والوحدات التابعة له.');
+ const root=await registrationParent(db,parent,tribeId,'subclan');
+ if(root!==parent)throw new HttpError(400,'اختر فرعًا رئيسيًا مباشرًا لنقل الفخذ.');
+ const related=await db.query(`with recursive subtree(id) as (
+   select id from public.lineage_units where id=$1 and tribe_id=$2
+   union select child.id from public.lineage_units child join subtree parent on child.parent_id=parent.id where child.tribe_id=$2
+  )
+  select array(select id from subtree) as ids,
+   exists(select 1 from public.lineage_family_fakhth_links x
+    where x.family_unit_id in (select id from subtree) and x.fakhth_unit_id not in (select id from subtree)) as external_link`,[id,tribeId]);
+ const result=related.rows[0];
+ if(result.external_link)throw new HttpError(409,'توجد عائلة في هذا الفخذ مرتبطة بفخذ خارجي. صحّح رابطها قبل النقل.');
+ return result.ids;
+}
 async function changeUnit(db,user,form){
  const id=uuid(form.get('id'),true),name=requiredName(field(form,'name',150)),parent=uuid(form.get('parent_id'));
  const current=(await db.query('select l.id,l.tribe_id,l.parent_id,l.unit_type,exists(select 1 from public.lineage_fakhths f where f.unit_id=l.id) as registered_fakhth from public.lineage_units l where l.id=$1 for update',[id])).rows[0];
  if(!current)throw new HttpError(404,'وحدة النسب غير موجودة');
  if(parent===id)throw new HttpError(409,'لا يمكن جعل الوحدة أصلًا لنفسها');
- if(parent)await checkUnit(db,parent,current.tribe_id);
+ const parentUnit=await checkUnit(db,parent,current.tribe_id);
  const parentChanged=parent!==current.parent_id;
+ if(parentChanged)validateUnitParent(current.unit_type,parentUnit,current.registered_fakhth);
  const isFakhth=current.unit_type==='subclan'||current.registered_fakhth;
  const updateFamilyLink=current.unit_type==='family'&&(parentChanged||form.get('ensure_fakhth')==='yes');
- let registryParent;
+ let registryParent,subtree=[];
  if(updateFamilyLink||(parentChanged&&isFakhth)){
   registryParent=await registrationParent(db,parent,current.tribe_id,current.unit_type);
  }
  if(parentChanged){
   if(current.unit_type!=='family'){
    const refs=await db.query('select 1 from public.lineage_units where parent_id=$1 limit 1',[id]);
-   if(refs.rowCount)throw new HttpError(409,'لا يمكن نقل فخذ يحتوي وحدات تابعة؛ يمكن تعديل اسمه أو نقل العائلات أولًا.');
+   if(refs.rowCount){
+    if(!current.registered_fakhth)throw new HttpError(409,'هذه الوحدة تحتوي وحدات تابعة. انقل وحداتها أولًا قبل تغيير أصلها.');
+    subtree=await validateFakhthTransfer(db,id,current.tribe_id,parent,form.get('confirm_subtree')==='yes');
+   }
   }
   const found=await db.query('with recursive family(id,parent_id,path) as (select id,parent_id,array[id] from public.lineage_units where id=$1 union all select u.id,u.parent_id,f.path||u.id from family f join public.lineage_units u on u.id=f.parent_id where not u.id=any(f.path)) select 1 from family where id=$2 limit 1',[parent,id]);
   if(found.rowCount)throw new HttpError(409,'نقل الوحدة يؤدي إلى دورة في شجرة الأنساب');
@@ -494,12 +520,40 @@ async function changeUnit(db,user,form){
   if(!link.rowCount)throw new HttpError(409,'أضف مصدر توثيق للعائلة قبل تغيير الفخذ المرتبط بها.');
  }
  if(parentChanged&&isFakhth){
-  await db.query("update public.lineage_fakhths set major_branch_id=$2 where unit_id=$1",[id,registryParent]);
+  await db.query("update public.lineage_fakhths set major_branch_id=$2,review_status='needs_review',verified_at=null,verified_by=null where unit_id=any($1::uuid[])",
+   [subtree.length?subtree:[id],registryParent]);
+  if(subtree.length>1)await db.query("update public.lineage_seed_reviews r set review_status='needs_review',verified_at=null,verified_by=null,reviewer_note=$2 from public.lineage_fakhths f where r.unit_id=f.unit_id and r.unit_id=any($1::uuid[]) and r.unit_id<>$3",
+   [subtree,'نقل الفخذ الأعلى يستلزم مراجعة المسار',id]);
  }
  await db.query("update public.lineage_seed_reviews set review_status='needs_review',verified_at=null,verified_by=null,reviewer_note=$2 where unit_id=$1",[id,'تعديل إداري يحتاج إعادة اعتماد']);
  await db.query("update public.lineage_fakhths set review_status='needs_review',verified_at=null,verified_by=null where unit_id=$1",[id]);
  await db.query("update public.lineage_family_fakhth_links set review_status='needs_review',verified_at=null,verified_by=null where family_unit_id=$1",[id]);
- await journal(db,user,'genealogy_unit_updated','lineage_units',id,{parentChanged,needsReview:true});
+ await journal(db,user,'genealogy_unit_updated','lineage_units',id,{parentChanged,affectedUnits:subtree.length||1,needsReview:true});
+ return id;
+}
+async function publishUnit(db,user,form){
+ await permit(user,'lineage.structure_apply');
+ const id=uuid(form.get('id'),true);
+ if(form.get('confirm')!=='yes')throw new HttpError(400,'أكّد مراجعة المصدر والموافقة على نشر الوحدة.');
+ const unit=(await db.query(`select l.id,l.parent_id,l.unit_type,r.review_status,r.source_id
+  from public.lineage_units l join public.lineage_seed_reviews r on r.unit_id=l.id
+  join public.sources s on s.id=r.source_id and s.tribe_id=l.tribe_id where l.id=$1 for update of l,r`,[id])).rows[0];
+ if(!unit||!['needs_review','verified'].includes(unit.review_status))throw new HttpError(409,'النشر متاح لوحدة قيد المراجعة أو موثقة ولها مصدر صالح.');
+ const pendingAncestor=await db.query(`with recursive ancestors(id,parent_id) as (
+  select id,parent_id from public.lineage_units where id=$1
+  union select l.id,l.parent_id from public.lineage_units l join ancestors a on l.id=a.parent_id
+ ) select 1 from ancestors a left join public.lineage_seed_reviews r on r.unit_id=a.id
+ where r.review_status is distinct from 'approved' limit 1`,[unit.parent_id]);
+ if(pendingAncestor.rowCount)throw new HttpError(409,'اعتمد الوحدات الأصلية في المسار أولًا.');
+ if(unit.unit_type==='family'){
+  const link=await db.query('select 1 from public.lineage_family_fakhth_links where family_unit_id=$1',[id]);
+  if(!link.rowCount)throw new HttpError(409,'اربط العائلة بفخذ مسجل ثم اعتمد النشر.');
+ }
+ const note='اعتمد الإداري مصدر الوحدة وتسلسلها';
+ await db.query("update public.lineage_seed_reviews set review_status='approved',verified_by=$2,verified_at=now(),reviewer_note=$3 where unit_id=$1",[id,user.id,note]);
+ await db.query("update public.lineage_fakhths set review_status='approved',verified_by=$2,verified_at=now() where unit_id=$1",[id,user.id]);
+ await db.query("update public.lineage_family_fakhth_links set review_status='approved',verified_by=$2,verified_at=now() where family_unit_id=$1",[id,user.id]);
+ await journal(db,user,'genealogy_unit_publication_approved','lineage_units',id,{sourceId:unit.source_id});
  return id;
 }
 async function withdrawUnit(db,user,form){
@@ -516,8 +570,8 @@ async function deleteUnitDraft(db,user,form){
  if(form.get('confirm')!=='delete')throw new HttpError(400,'يرجى تأكيد حذف الوحدة غير المعتمدة');
  const entry=(await db.query('select unit_type,tribe_id from public.lineage_units where id=$1 for update',[id])).rows[0];
  if(!entry)throw new HttpError(404,'الوحدة غير موجودة');
- const review=(await db.query('select review_status,raw_source_path from public.lineage_seed_reviews where unit_id=$1 for update',[id])).rows[0];
- if(!review||review.review_status!=='needs_review'||!String(review.raw_source_path).startsWith('admin/manual/'))
+ const review=(await db.query("select r.review_status,r.raw_source_path,exists(select 1 from public.permission_audit_events a where a.event_type='genealogy_unit_publication_approved' and a.metadata->>'id'=r.unit_id::text) was_published from public.lineage_seed_reviews r where r.unit_id=$1 for update",[id])).rows[0];
+ if(!review||review.was_published||review.review_status!=='needs_review'||!String(review.raw_source_path).startsWith('admin/manual/'))
    throw new HttpError(409,'الحذف الدائم متاح للمسودات اليدوية غير المرتبطة فقط. إذا كانت الوحدة منشورة، اختر إيقاف النشر للمراجعة.');
  const dep=await db.query('select 1 from public.lineage_units where parent_id=$1 union all select 1 from public.people where family_unit_id=$1 union all select 1 from public.lineage_family_fakhth_links where fakhth_unit_id=$1 limit 1',[id]);
  if(dep.rowCount)throw new HttpError(409,'الوحدة تحتوي أفرادًا أو فروعًا؛ احفظ التسلسل واستخدم المراجعة');
@@ -538,6 +592,7 @@ const ACTIONS={
  create_unit:['lineage.structure_apply',createUnit],
  edit_unit:['lineage.structure_apply',changeUnit],
  withdraw_unit:['lineage.structure_apply',withdrawUnit],
+ publish_unit:['lineage.approve',publishUnit],
  delete_unit_draft:['lineage.structure_apply',deleteUnitDraft],
 };
 export async function genealogyAction(user,form){
@@ -547,7 +602,7 @@ export async function genealogyAction(user,form){
  const db=await pool.connect();
  try{
   await db.query('begin');
-  if(['create_unit','edit_unit','withdraw_unit','delete_unit_draft','create_tree','add_relation','edit_person'].includes(action)){
+  if(['create_unit','edit_unit','withdraw_unit','publish_unit','delete_unit_draft','create_tree','add_relation','edit_person'].includes(action)){
    await db.query('select pg_advisory_xact_lock(723145, 1)');
   }
   const result=await entry[1](db,user,form);
@@ -586,6 +641,10 @@ export async function genealogyData(user,url){
  await permit(user,'identity.read');
  const q=clip(url.searchParams.get('q'),70);
  const unitQ=clip(url.searchParams.get('unit_q'),70);
+ const unitTribe=clip(url.searchParams.get('unit_tribe'),36);
+ const unitType=clip(url.searchParams.get('unit_type'),16);
+ const unitStatus=clip(url.searchParams.get('unit_status'),20);
+ const tribeFilter=isId(unitTribe)?unitTribe:null;
  const view=clip(url.searchParams.get('view'),16)||(!q&&!url.searchParams.has('people_page')&&(unitQ||url.searchParams.has('unit_page'))?'units':'people');
  const personStatus=clip(url.searchParams.get('person_status'),24);
  const gap=clip(url.searchParams.get('gap'),16);
@@ -615,9 +674,22 @@ export async function genealogyData(user,url){
  const personRegistry=!creation&&!unitRegistry&&view!=='identity'&&!(view==='sources'&&permissions[1]);
  const queryWhen=(condition,sql,args=[])=>condition?pool.query(sql,args):Promise.resolve({rows:[]});
  const [tribes,people,units,sources,stats,directory,directoryUnits,focusPerson,focusUnit,selectedPeople]=await Promise.all([
-  queryWhen(creation||unitRegistry&&permissions[1],'select id,name_ar from public.tribes order by name_ar limit 40'),
+  queryWhen(creation||unitRegistry,'select id,name_ar from public.tribes order by name_ar'),
   queryWhen(personRegistry,peopleSQL,[q,pageSize+1,(page-1)*pageSize,personStatus,gap]),
-  queryWhen(unitRegistry,"select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,r.review_status from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id where ($1='' or position(lower($1) in lower(l.name_ar))>0) order by l.name_ar,l.id limit $2 offset $3",[unitQ,pageSize+1,(unitPage-1)*pageSize]),
+  queryWhen(unitRegistry,`select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,r.review_status,
+    t.name_ar tribe_name,p.name_ar parent_name,k.name_ar fakhth_name,rf.unit_id is not null as registered_fakhth
+    from public.lineage_units l join public.tribes t on t.id=l.tribe_id
+    left join public.lineage_units p on p.id=l.parent_id
+    left join public.lineage_seed_reviews r on r.unit_id=l.id
+    left join public.lineage_fakhths rf on rf.unit_id=l.id
+    left join public.lineage_family_fakhth_links link on link.family_unit_id=l.id
+    left join public.lineage_units k on k.id=link.fakhth_unit_id
+    where ($1='' or position(lower($1) in lower(l.name_ar))>0)
+    and ($4::uuid is null or l.tribe_id=$4)
+    and ($5='' or l.unit_type=$5 or ($5='subclan' and rf.unit_id is not null))
+    and ($6='' or r.review_status=$6)
+    order by l.name_ar,l.id limit $2 offset $3`,
+   [unitQ,pageSize+1,(unitPage-1)*pageSize,tribeFilter,unitType,unitStatus]),
   queryWhen(permissions[1]&&(unitRegistry||view==='sources'),'select id,tribe_id,title,source_type,author,publication_year from public.sources order by created_at desc,id'),
   queryWhen(personRegistry&&!personEditor,"select (select count(*) from public.people) people,(select count(*) from public.people where record_status='under_review') drafts,(select count(*) from public.lineage_units) units,(select count(*) from public.lineage_seed_reviews where review_status='needs_review') unit_reviews,(select count(*) from public.people where birth_date is null) missing_birth,(select count(*) from public.people where family_unit_id is null) missing_family"),
   queryWhen(personEditor||creation,"select p.id,p.full_name_ar,p.gender,p.record_status,(select pi.masked_value from public.person_identifiers pi where pi.person_id=p.id and pi.status<>'revoked' order by pi.created_at desc limit 1) identity_mask from public.people p where p.record_status<>'archived' order by p.full_name_ar limit 400"),
@@ -625,11 +697,21 @@ export async function genealogyData(user,url){
    'select u.id,u.tribe_id,u.parent_id,u.unit_type,u.name_ar,l.fakhth_unit_id,f.unit_id is not null registered_fakhth from public.lineage_units u left join public.lineage_family_fakhth_links l on l.family_unit_id=u.id left join public.lineage_fakhths f on f.unit_id=u.id order by u.name_ar,u.id'),
   queryWhen(personEditor,"select p.id,p.full_name_ar,p.gender,p.record_status,p.family_unit_id,p.tribe_id,p.father_id,p.mother_id,p.given_name_ar,p.middle_name_ar,p.surname_ar,p.birth_date,p.birth_date_precision,p.death_date,p.death_date_precision,p.living_status,p.birth_place,p.biography,pp.* from public.people p left join public.person_private pp on pp.person_id=p.id where p.id=$1 limit 1",[focusPersonId]),
   queryWhen(unitEditor,`select l.id,l.tribe_id,l.parent_id,l.unit_type,l.name_ar,l.name_en,l.description,
-   s.title as source_title,r.review_status,coalesce(r.raw_source_path like 'admin/manual/%',false) as manual_draft,
+   s.title as source_title,r.review_status,t.name_ar tribe_name, p.name_ar parent_name,k.name_ar fakhth_name,
+   rf.unit_id is not null as registered_fakhth,
+   (select count(*) from public.lineage_units child where child.parent_id=l.id) as child_count,
+   coalesce(r.raw_source_path like 'admin/manual/%',false) and not exists(
+     select 1 from public.permission_audit_events a where a.event_type='genealogy_unit_publication_approved' and a.metadata->>'id'=l.id::text
+   ) as manual_draft,
    (exists (select 1 from public.lineage_units child where child.parent_id=l.id)
    or exists (select 1 from public.people p where p.family_unit_id=l.id)
    or exists (select 1 from public.lineage_family_fakhth_links f where f.fakhth_unit_id=l.id)) as has_links
-   from public.lineage_units l left join public.lineage_seed_reviews r on r.unit_id=l.id
+   from public.lineage_units l join public.tribes t on t.id=l.tribe_id
+   left join public.lineage_units p on p.id=l.parent_id
+   left join public.lineage_fakhths rf on rf.unit_id=l.id
+   left join public.lineage_family_fakhth_links link on link.family_unit_id=l.id
+   left join public.lineage_units k on k.id=link.fakhth_unit_id
+   left join public.lineage_seed_reviews r on r.unit_id=l.id
    left join public.sources s on s.id=r.source_id where l.id=$1 limit 1`,[focusUnitId]),
   queryWhen(personEditor||creation&&childOfId,
     "select p.id,p.full_name_ar,p.gender,p.record_status from public.people p where "+
@@ -661,5 +743,5 @@ export async function genealogyData(user,url){
    if(!parentOptions.has(person.id))parentOptions.set(person.id,person);
  }
  return {tribes:tribes.rows,people:people.rows.slice(0,pageSize),peoplePage:page,hasMorePeople:people.rows.length>pageSize,
-   directory:[...parentOptions.values()],childOf:parentOptions.get(childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows.slice(0,pageSize),unitPage,hasMoreUnits:units.rows.length>pageSize,focusedPerson:focused,birthRecords:birthRecords.rows,relations:{ancestors:ancestors.rows,spouses:spouses.rows,children:children.rows},focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0]||{},canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ,view,personStatus,gap};
+   directory:[...parentOptions.values()],childOf:parentOptions.get(childOfId)||null,directoryUnits:directoryUnits.rows,units:units.rows.slice(0,pageSize),unitPage,hasMoreUnits:units.rows.length>pageSize,focusedPerson:focused,birthRecords:birthRecords.rows,relations:{ancestors:ancestors.rows,spouses:spouses.rows,children:children.rows},focusedUnit:focusUnit.rows[0]||null,sources:sources.rows,stats:stats.rows[0]||{},unitTribe,unitType,unitStatus,canPublish:unitEditor&&await authorized(user,'lineage.approve'),canEditPeople:permissions[0],canEditUnits:permissions[1],q,unitQ,view,personStatus,gap};
 }
