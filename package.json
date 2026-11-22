@@ -19,7 +19,7 @@
     "functions:test": "node --test backend/neon/*.test.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.900.0",
+    "@aws-sdk/client-s3": "^3.1172.0",
     "@aws-sdk/s3-request-presigner": "^3.900.0",
     "@neon/config": "^1.13.0",
     "@neon/functions": "^0.8.0",
